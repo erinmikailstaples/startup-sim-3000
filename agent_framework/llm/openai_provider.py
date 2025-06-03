@@ -1,8 +1,9 @@
 from typing import Any, Dict, List, Optional, AsyncGenerator, Type, TypeVar
-from openai import AsyncOpenAI
+from galileo.openai import openai  # Use Galileo's OpenAI wrapper
 from pydantic import BaseModel
 import os
 from dotenv import load_dotenv
+import asyncio
 
 from .base import LLMProvider
 from .models import LLMMessage, LLMResponse, LLMConfig
@@ -27,9 +28,7 @@ class OpenAIProvider(LLMProvider):
         if not self.api_key:
             raise ValueError("OpenAI API key must be provided or set in OPENAI_API_KEY environment variable")
             
-        self.client = AsyncOpenAI(
-            api_key=self.api_key
-        )
+        self.client = openai.OpenAI(api_key=self.api_key)  # Use Galileo's OpenAI client
 
     def _prepare_messages(
         self,
@@ -68,17 +67,20 @@ class OpenAIProvider(LLMProvider):
         openai_messages = self._prepare_messages(messages)
         api_config = self._prepare_config(config)
         
-        response = await self.client.chat.completions.create(
+        response = await asyncio.to_thread(
+            self.client.chat.completions.create,
             messages=openai_messages,
             **api_config
         )
         
         choice = response.choices[0]
+        usage = response.usage.model_dump() if response.usage else {}
+        filtered_usage = {k: v for k, v in usage.items() if isinstance(v, int)}
         return LLMResponse(
             content=choice.message.content,
             raw_response=response.model_dump(),
             finish_reason=choice.finish_reason,
-            usage=response.usage.model_dump() if response.usage else None
+            usage=filtered_usage if filtered_usage else None
         )
 
     async def generate_stream(
