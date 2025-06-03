@@ -2,6 +2,7 @@ import asyncio
 from agent_framework.config import AgentConfiguration
 from agent_framework.factory import AgentFactory
 from agent import SimpleAgent
+from galileo  import Galileo
 
 async def main():
     # Create configuration

@@ -10,6 +10,7 @@ from agent_framework.llm.openai_provider import OpenAIProvider
 from agent_framework.utils.logging import AgentLogger
 from tools.text_analysis import TextAnalyzerTool
 from tools.keyword_extraction import KeywordExtractorTool
+from tools.startup_simulator import StartupSimulatorTool
 
 class SimpleAgent(Agent):
     """A simple agent that demonstrates basic functionality"""
@@ -62,6 +63,12 @@ class SimpleAgent(Agent):
         self.tool_registry.register(
             metadata=KeywordExtractorTool.get_metadata(),
             implementation=KeywordExtractorTool
+        )
+        
+        # Startup simulator
+        self.tool_registry.register(
+            metadata=StartupSimulatorTool.get_metadata(),
+            implementation=StartupSimulatorTool
         )
 
     async def _format_result(self, task: str, results: List[tuple[str, Dict[str, Any]]]) -> str:
