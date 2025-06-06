@@ -15,6 +15,6 @@ class BaseTool(ABC):
         return cls.metadata()  # This will use the default values defined in the metadata class
     
     @abstractmethod
-    async def execute(self, **inputs: Any) -> Dict[str, Any] | ToolError:
+    async def execute(self, **inputs: Any) -> Dict[str, Any]:
         """Execute the tool with given inputs"""
-        pass 
+        raise NotImplementedError("Tool must implement execute method") 

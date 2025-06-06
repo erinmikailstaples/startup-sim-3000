@@ -1,7 +1,15 @@
+import os
+from galileo.openai import openai
+from galileo import log, galileo_context
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
+import asyncio
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 class StartupSimulatorTool(BaseTool):
     """Tool for generating a silly startup pitch using OpenAI's API"""
@@ -36,10 +44,20 @@ class StartupSimulatorTool(BaseTool):
             f"The startup is in the '{industry}' industry, targets '{audience}', and must include the word '{random_word}'. "
             f"Make it fun and a little absurd!"
         )
-        llm = getattr(self, 'llm_provider', None)
-        if llm is None:
-            raise RuntimeError("LLM provider is not set for this tool.")
-        messages = [LLMMessage(role="user", content=prompt)]
-        response = await llm.generate(messages)
-        pitch = response.content.strip()[:500]
-        return {"pitch": pitch} 
+        
+        # Initialize OpenAI client with Galileo integration
+        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        
+        # Create messages with Galileo context
+        messages = [{"role": "user", "content": prompt}]
+        
+        # Execute the API call within Galileo context
+        with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
+            response = await asyncio.to_thread(
+                client.chat.completions.create,
+                messages=messages,
+                model="gpt-4"
+            )
+            
+            pitch = response.choices[0].message.content.strip()[:500]
+            return {"pitch": pitch} 
