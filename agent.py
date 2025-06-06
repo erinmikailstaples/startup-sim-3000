@@ -115,72 +115,71 @@ class SimpleAgent(Agent):
         
         return "\n".join(formatted_result)
 
-    @log(span_type="agent", name="run")
+    @log(span_type="workflow", name="agent_execution")
     async def run(self, task: str) -> str:
         """Execute the agent's task with Galileo monitoring"""
-        with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
-            # First, get some context from HackerNews
-            try:
-                # Get the HackerNews tool implementation
-                hn_tool_impl = self.tool_registry.get_implementation("hackernews_tool")
-                if not hn_tool_impl:
-                    raise ValueError("HackerNews tool not found in registry")
-                
-                # Create an instance and execute it
-                hn_tool = hn_tool_impl()
-                async with hn_tool:
-                    result = await hn_tool.execute(limit=3)
-                    if "stories" in result:
-                        context = "Recent HackerNews stories:\n"
-                        for story in result["stories"]:
-                            context += f"- {story['title']}\n"
-                        print("\nContext from HackerNews:")
-                        print(context)
-                    else:
-                        context = ""
-            except Exception as e:
-                print(f"Warning: Could not fetch HackerNews stories: {e}")
-                context = ""
+        # First, get some context from HackerNews
+        try:
+            # Get the HackerNews tool implementation
+            hn_tool_impl = self.tool_registry.get_implementation("hackernews_tool")
+            if not hn_tool_impl:
+                raise ValueError("HackerNews tool not found in registry")
+            
+            # Create an instance and execute it
+            hn_tool = hn_tool_impl()
+            async with hn_tool:
+                result = await hn_tool.execute(limit=3)
+                if "stories" in result:
+                    context = "Recent HackerNews stories:\n"
+                    for story in result["stories"]:
+                        context += f"- {story['title']}\n"
+                    print("\nContext from HackerNews:")
+                    print(context)
+                else:
+                    context = ""
+        except Exception as e:
+            print(f"Warning: Could not fetch HackerNews stories: {e}")
+            context = ""
 
-            # Execute the main task by calling parent run but intercepting before final format
-            try:
-                self.current_task = TaskExecution(
-                    task_id=str(uuid4()),
-                    agent_id=self.agent_id,
-                    input=task,
-                    start_time=datetime.now(),
-                    steps=[]
-                )
+        # Execute the main task by calling parent run but intercepting before final format
+        try:
+            self.current_task = TaskExecution(
+                task_id=str(uuid4()),
+                agent_id=self.agent_id,
+                input=task,
+                start_time=datetime.now(),
+                steps=[]
+            )
 
-                if self.logger:
-                    self.logger.on_agent_start(task)
+            if self.logger:
+                self.logger.on_agent_start(task)
 
-                # Create a plan using chain of thought reasoning
-                self._current_plan = await self.plan_task(task)
-                
-                # Execute each step in the plan to get raw results
-                results = []
-                for step in self._current_plan.execution_plan:
-                    result = await self._execute_step(step, task, self._current_plan)
-                    results.append((step["tool"], result))
-                
-                # Format the results using our custom HN style
-                formatted_result = await self._format_result(task, results)
-                self.current_task.output = formatted_result
-                
-                # Only call on_agent_done after all tools have completed
-                if self.logger:
-                    await self.logger.on_agent_done(formatted_result, self.message_history)
-                
-                return formatted_result
-                
-            except Exception as e:
-                self.current_task.error = str(e)
-                self.current_task.status = "failed"
-                print(f"Error during task execution: {e}")
-                return f"Error: {str(e)}"
-            finally:
-                self.current_task.end_time = datetime.now()
-                if self.current_task.status == "in_progress":
-                    self.current_task.status = "completed"
-                self._current_plan = None  # Clear the plan 
+            # Create a plan using chain of thought reasoning
+            self._current_plan = await self.plan_task(task)
+            
+            # Execute each step in the plan to get raw results
+            results = []
+            for step in self._current_plan.execution_plan:
+                result = await self._execute_step(step, task, self._current_plan)
+                results.append((step["tool"], result))
+            
+            # Format the results using our custom HN style
+            formatted_result = await self._format_result(task, results)
+            self.current_task.output = formatted_result
+            
+            # Only call on_agent_done after all tools have completed
+            if self.logger:
+                await self.logger.on_agent_done(formatted_result, self.message_history)
+            
+            return formatted_result
+            
+        except Exception as e:
+            self.current_task.error = str(e)
+            self.current_task.status = "failed"
+            print(f"Error during task execution: {e}")
+            return f"Error: {str(e)}"
+        finally:
+            self.current_task.end_time = datetime.now()
+            if self.current_task.status == "in_progress":
+                self.current_task.status = "completed"
+            self._current_plan = None  # Clear the plan 

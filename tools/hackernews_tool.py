@@ -165,6 +165,7 @@ class HackerNewsTool(BaseTool):
             "type": story.type
         }
 
+    @log(span_type="tool", name="hackernews_tool")
     async def execute(self, **inputs: Any) -> Dict[str, Any]:
         """Execute the HackerNews tool"""
         story_id = inputs.get('story_id')

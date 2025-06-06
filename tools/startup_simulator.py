@@ -37,6 +37,7 @@ class StartupSimulatorTool(BaseTool):
             }
         )
 
+    @log(span_type="tool", name="startup_simulator")
     async def execute(self, industry: str, audience: str, random_word: str) -> Dict[str, Any]:
         """Generate a silly startup pitch using the LLM provider"""
         prompt = (
@@ -51,12 +52,11 @@ class StartupSimulatorTool(BaseTool):
         # Create messages with Galileo context
         messages = [{"role": "user", "content": prompt}]
         
-        # Execute the API call within Galileo context
-        with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
-            response = await client.chat.completions.create(
-                messages=messages,
-                model="gpt-4"
-            )
-            
-            pitch = response.choices[0].message.content.strip()[:500]
-            return {"pitch": pitch} 
+        # Execute the API call (Galileo context inherited from parent workflow)
+        response = await client.chat.completions.create(
+            messages=messages,
+            model="gpt-4"
+        )
+        
+        pitch = response.choices[0].message.content.strip()[:500]
+        return {"pitch": pitch} 
