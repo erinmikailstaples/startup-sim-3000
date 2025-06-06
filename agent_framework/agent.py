@@ -370,6 +370,11 @@ class Agent(ABC):
             elif input_schema.get("type") == "string":
                 mapped_inputs[input_name] = task
         
+        # For tools with no required inputs, return empty dict (all optional)
+        required_fields = tool.input_schema.get("required", [])
+        if not required_fields and not mapped_inputs:
+            return {}  # All inputs are optional, can call with no params
+            
         if mapped_inputs:
             return mapped_inputs
             

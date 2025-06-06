@@ -36,7 +36,7 @@ async def main():
 
     # Run the agent within Galileo context
     with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
-        result = await agent.execute(task)
+        result = await agent.run(task)
         print(result)
 
 if __name__ == "__main__":

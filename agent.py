@@ -3,12 +3,14 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 import time
 import os
+from uuid import uuid4
+from datetime import datetime
 from dotenv import load_dotenv
 from galileo import galileo_context, log
 
 from agent_framework.agent import Agent
 from agent_framework.state import AgentState
-from agent_framework.models import VerbosityLevel, ToolSelectionHooks
+from agent_framework.models import VerbosityLevel, ToolSelectionHooks, TaskExecution
 from agent_framework.llm.models import LLMConfig
 from agent_framework.llm.openai_provider import OpenAIProvider
 from agent_framework.utils.logging import AgentLogger
@@ -113,8 +115,8 @@ class SimpleAgent(Agent):
         
         return "\n".join(formatted_result)
 
-    @log(span_type="agent", name="execute")
-    async def execute(self, task: str) -> str:
+    @log(span_type="agent", name="run")
+    async def run(self, task: str) -> str:
         """Execute the agent's task with Galileo monitoring"""
         with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
             # First, get some context from HackerNews
@@ -140,14 +142,45 @@ class SimpleAgent(Agent):
                 print(f"Warning: Could not fetch HackerNews stories: {e}")
                 context = ""
 
-            # Execute the main task
+            # Execute the main task by calling parent run but intercepting before final format
             try:
-                # Use run() instead of execute()
-                results = await super().run(task)
+                self.current_task = TaskExecution(
+                    task_id=str(uuid4()),
+                    agent_id=self.agent_id,
+                    input=task,
+                    start_time=datetime.now(),
+                    steps=[]
+                )
+
+                if self.logger:
+                    self.logger.on_agent_start(task)
+
+                # Create a plan using chain of thought reasoning
+                self._current_plan = await self.plan_task(task)
                 
-                # Format the results using HN style
+                # Execute each step in the plan to get raw results
+                results = []
+                for step in self._current_plan.execution_plan:
+                    result = await self._execute_step(step, task, self._current_plan)
+                    results.append((step["tool"], result))
+                
+                # Format the results using our custom HN style
                 formatted_result = await self._format_result(task, results)
+                self.current_task.output = formatted_result
+                
+                # Only call on_agent_done after all tools have completed
+                if self.logger:
+                    await self.logger.on_agent_done(formatted_result, self.message_history)
+                
                 return formatted_result
+                
             except Exception as e:
+                self.current_task.error = str(e)
+                self.current_task.status = "failed"
                 print(f"Error during task execution: {e}")
-                return f"Error: {str(e)}" 
+                return f"Error: {str(e)}"
+            finally:
+                self.current_task.end_time = datetime.now()
+                if self.current_task.status == "in_progress":
+                    self.current_task.status = "completed"
+                self._current_plan = None  # Clear the plan 
