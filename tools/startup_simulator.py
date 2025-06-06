@@ -1,0 +1,45 @@
+from typing import Dict, Any
+from agent_framework.tools.base import BaseTool
+from agent_framework.models import ToolMetadata
+from agent_framework.llm.models import LLMMessage
+
+class StartupSimulatorTool(BaseTool):
+    """Tool for generating a silly startup pitch using OpenAI's API"""
+
+    @classmethod
+    def get_metadata(cls) -> ToolMetadata:
+        return ToolMetadata(
+            name="startup_simulator",
+            description="Generates a silly startup pitch using OpenAI's API, based on user input.",
+            tags=["startup", "generator", "openai", "fun"],
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "industry": {"type": "string", "description": "Industry for the startup"},
+                    "audience": {"type": "string", "description": "Target audience"},
+                    "random_word": {"type": "string", "description": "A random word to include"}
+                },
+                "required": ["industry", "audience", "random_word"]
+            },
+            output_schema={
+                "type": "object",
+                "properties": {
+                    "pitch": {"type": "string", "description": "A silly startup pitch (max 500 chars)"}
+                }
+            }
+        )
+
+    async def execute(self, industry: str, audience: str, random_word: str) -> Dict[str, Any]:
+        """Generate a silly startup pitch using the LLM provider"""
+        prompt = (
+            f"Create a silly, creative startup pitch in 500 characters or less. "
+            f"The startup is in the '{industry}' industry, targets '{audience}', and must include the word '{random_word}'. "
+            f"Make it fun and a little absurd!"
+        )
+        llm = getattr(self, 'llm_provider', None)
+        if llm is None:
+            raise RuntimeError("LLM provider is not set for this tool.")
+        messages = [LLMMessage(role="user", content=prompt)]
+        response = await llm.generate(messages)
+        pitch = response.content.strip()[:500]
+        return {"pitch": pitch} 
