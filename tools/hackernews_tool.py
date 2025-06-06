@@ -91,8 +91,8 @@ class HackerNewsTool(BaseTool):
     async def get_story(self, story_id: int) -> Optional[HNStory]:
         """Fetch a story by its ID"""
         try:
-            async with await self.session as session:
-                async with session.get(f"{self.BASE_URL}/item/{story_id}.json") as response:
+            session = await self.session
+            async with session.get(f"{self.BASE_URL}/item/{story_id}.json") as response:
                     response.raise_for_status()
                     data = await response.json()
                     
@@ -117,8 +117,8 @@ class HackerNewsTool(BaseTool):
     async def get_top_stories(self, limit: int = 10) -> List[int]:
         """Get IDs of top stories"""
         try:
-            async with await self.session as session:
-                async with session.get(f"{self.BASE_URL}/topstories.json") as response:
+            session = await self.session
+            async with session.get(f"{self.BASE_URL}/topstories.json") as response:
                     response.raise_for_status()
                     return (await response.json())[:limit]
         except Exception as e:

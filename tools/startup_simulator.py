@@ -45,16 +45,15 @@ class StartupSimulatorTool(BaseTool):
             f"Make it fun and a little absurd!"
         )
         
-        # Initialize OpenAI client with Galileo integration
-        client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        # Initialize async OpenAI client with Galileo integration
+        client = openai.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         
         # Create messages with Galileo context
         messages = [{"role": "user", "content": prompt}]
         
         # Execute the API call within Galileo context
         with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
-            response = await asyncio.to_thread(
-                client.chat.completions.create,
+            response = await client.chat.completions.create(
                 messages=messages,
                 model="gpt-4"
             )
