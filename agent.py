@@ -3,6 +3,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 import time
 import os
+import json
 from uuid import uuid4
 from datetime import datetime
 from dotenv import load_dotenv
@@ -120,6 +121,16 @@ class SimpleAgent(Agent):
     @log(span_type="workflow", name="agent_execution")
     async def run(self, task: str) -> str:
         """Execute the agent's task with Galileo monitoring"""
+        
+        # Log workflow start as JSON
+        workflow_data = {
+            "agent_id": self.agent_id,
+            "mode": self.mode,
+            "task": task,
+            "start_time": datetime.now().isoformat(),
+            "tools_registered": list(self.tool_registry.get_all_tools().keys())
+        }
+        print(f"Agent Workflow Start: {json.dumps(workflow_data, indent=2)}")
         # Get context based on mode
         if self.mode == "serious":
             # For serious mode, get NewsAPI context
@@ -194,6 +205,18 @@ class SimpleAgent(Agent):
             # Format the results using our custom HN style
             formatted_result = await self._format_result(task, results)
             self.current_task.output = formatted_result
+            
+            # Log workflow completion as JSON
+            completion_data = {
+                "agent_id": self.agent_id,
+                "mode": self.mode,
+                "task": task,
+                "end_time": datetime.now().isoformat(),
+                "result_length": len(formatted_result),
+                "tools_used": [result[0] for result in results],
+                "execution_status": "success"
+            }
+            print(f"Agent Workflow Complete: {json.dumps(completion_data, indent=2)}")
             
             # Only call on_agent_done after all tools have completed
             if self.logger:
