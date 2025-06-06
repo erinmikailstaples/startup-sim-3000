@@ -28,7 +28,7 @@ class OpenAIProvider(LLMProvider):
         if not self.api_key:
             raise ValueError("OpenAI API key must be provided or set in OPENAI_API_KEY environment variable")
             
-        self.client = openai.OpenAI(api_key=self.api_key)  # Use Galileo's OpenAI client
+        self.client = openai.AsyncOpenAI(api_key=self.api_key)  # Use Galileo's async OpenAI client
 
     def _prepare_messages(
         self,
@@ -67,8 +67,7 @@ class OpenAIProvider(LLMProvider):
         openai_messages = self._prepare_messages(messages)
         api_config = self._prepare_config(config)
         
-        response = await asyncio.to_thread(
-            self.client.chat.completions.create,
+        response = await self.client.chat.completions.create(
             messages=openai_messages,
             **api_config
         )

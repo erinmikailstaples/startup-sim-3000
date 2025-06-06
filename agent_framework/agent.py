@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from datetime import datetime
+from galileo import log
 from .utils.logging import AgentLogger
 from .utils.tool_registry import ToolRegistry
 
@@ -56,7 +57,7 @@ class Agent(ABC):
         # Set tool selection hooks
         self.tool_selection_hooks = logger.get_tool_selection_hooks()
 
-    def log(self, message: str, level: VerbosityLevel = VerbosityLevel.LOW) -> None:
+    def log_message(self, message: str, level: VerbosityLevel = VerbosityLevel.LOW) -> None:
         """Log a message if verbosity level is sufficient"""
         if self.config.verbosity.value >= level.value:
             print(message)
@@ -82,6 +83,7 @@ class Agent(ABC):
             plan=self._current_plan  # Pass the current plan in the context
         )
 
+    @log(span_type="tool", name="tool_execution")
     async def call_tool(
         self,
         tool_name: str,
@@ -370,6 +372,11 @@ class Agent(ABC):
             elif input_schema.get("type") == "string":
                 mapped_inputs[input_name] = task
         
+        # For tools with no required inputs, return empty dict (all optional)
+        required_fields = tool.input_schema.get("required", [])
+        if not required_fields and not mapped_inputs:
+            return {}  # All inputs are optional, can call with no params
+            
         if mapped_inputs:
             return mapped_inputs
             
