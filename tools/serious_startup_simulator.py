@@ -31,13 +31,8 @@ class SeriousStartupSimulatorTool(BaseTool):
                 "required": ["industry", "audience", "random_word"]
             },
             output_schema={
-                "type": "object",
-                "properties": {
-                    "pitch": {"type": "string", "description": "A serious business pitch"},
-                    "market_analysis": {"type": "string", "description": "Market analysis section"},
-                    "financial_projections": {"type": "string", "description": "Financial overview"},
-                    "competitive_landscape": {"type": "string", "description": "Competitive analysis"}
-                }
+                "type": "string",
+                "description": "JSON string containing professional startup pitch data with metadata"
             }
         )
 
@@ -111,10 +106,30 @@ class SeriousStartupSimulatorTool(BaseTool):
             "news_context_used": bool(news_context)
         }
         
-        # Log output as JSON
-        print(f"Serious Startup Simulator Output: {json.dumps(output, indent=2)}")
+        # Log output as JSON to console and for Galileo observability
+        output_log = {
+            "tool_execution": "serious_startup_simulator",
+            "inputs": inputs,
+            "output": output,
+            "metadata": {
+                "character_count": output["character_count"],
+                "mode": output["mode"],
+                "news_context_used": output["news_context_used"],
+                "timestamp": output["timestamp"]
+            }
+        }
+        print(f"Serious Startup Simulator Output: {json.dumps(output_log, indent=2)}")
         
-        return output
+        # Return JSON string for proper Galileo logging display
+        galileo_output = {
+            "tool_result": "serious_startup_simulator",
+            "formatted_output": json.dumps(output, indent=2),
+            "pitch": output["pitch"],
+            "metadata": output
+        }
+        
+        # Return as formatted JSON string for Galileo
+        return json.dumps(galileo_output, indent=2)
     
     def _parse_business_pitch(self, content: str) -> Dict[str, str]:
         """Parse the business pitch into structured sections"""

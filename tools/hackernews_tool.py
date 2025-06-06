@@ -201,10 +201,29 @@ class HackerNewsTool(BaseTool):
                 "story_id": story_id
             }
             
-            # Log output as JSON
-            print(f"HackerNews Tool Output: {json.dumps(output, indent=2)}")
+            # Log output as JSON to console and for Galileo observability
+            output_log = {
+                "tool_execution": "hackernews_tool",
+                "inputs": input_data,
+                "output": output,
+                "metadata": {
+                    "total_stories": output["total_stories"],
+                    "limit": output["limit"],
+                    "api_source": "HackerNews"
+                }
+            }
+            print(f"HackerNews Tool Output: {json.dumps(output_log, indent=2)}")
             
-            return output
+            # Return JSON string for proper Galileo logging display
+            galileo_output = {
+                "tool_result": "hackernews_tool",
+                "formatted_output": json.dumps(output, indent=2),
+                "stories": output["stories"],
+                "metadata": output
+            }
+            
+            # Return as formatted JSON string for Galileo
+            return json.dumps(galileo_output, indent=2)
         finally:
             # Ensure session is closed
             if self._session and not self._session.closed:

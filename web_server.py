@@ -41,28 +41,40 @@ def generate_startup():
                 "audience": audience,
                 "random_word": random_word,
                 "mode": mode
-            },
-            "timestamp": asyncio.get_event_loop().time()
+            }
         }
         print(f"API Request: {json.dumps(api_request, indent=2)}")
         
         if not industry or not audience or not random_word:
             return jsonify({'error': 'All fields are required'}), 400
         
-        # Run the agent asynchronously
-        result = asyncio.run(run_agent(industry, audience, random_word, mode))
+        # Run the agent asynchronously with proper event loop handling
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            agent_result = loop.run_until_complete(run_agent(industry, audience, random_word, mode))
+        finally:
+            loop.close()
+        
+        # Parse the structured JSON result from agent
+        try:
+            parsed_result = json.loads(agent_result)
+            final_output = parsed_result.get("final_output", "No output generated")
+        except json.JSONDecodeError:
+            # Fallback if result is not JSON
+            final_output = str(agent_result)
         
         # Log API response as JSON
         api_response = {
             "endpoint": "/api/generate",
             "status": "success",
-            "result_length": len(result),
+            "result_length": len(final_output),
             "mode": mode,
-            "timestamp": asyncio.get_event_loop().time()
+            "agent_result_preview": str(agent_result)[:200] + "..." if len(str(agent_result)) > 200 else str(agent_result)
         }
         print(f"API Response: {json.dumps(api_response, indent=2)}")
         
-        return jsonify({'result': result})
+        return jsonify({'result': final_output})
         
     except Exception as e:
         print(f"Error generating startup: {e}")
