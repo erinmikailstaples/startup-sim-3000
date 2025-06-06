@@ -104,17 +104,57 @@ class SimpleAgent(Agent):
             implementation=NewsAPITool
         )
 
-    async def _format_result(self, task: str, results: List[tuple[str, Dict[str, Any]]]) -> str:
+    async def _format_result(self, task: str, results: List[tuple[str, Any]]) -> str:
         """Format the final result from tool executions"""
         # Check for silly mode first
         for tool_name, result in results:
-            if tool_name == "startup_simulator" and "pitch" in result:
-                return result["pitch"]
+            if tool_name == "startup_simulator":
+                # Parse the JSON string result from Galileo-formatted output
+                try:
+                    if isinstance(result, str):
+                        parsed_result = json.loads(result)
+                        pitch = parsed_result.get("pitch", "")
+                    else:
+                        # Fallback for dict format (shouldn't happen now)
+                        pitch = result.get("pitch", "")
+                    
+                    # Log full structured result to Galileo
+                    result_data = {
+                        "tool": tool_name,
+                        "mode": "silly",
+                        "full_result": result,
+                        "extracted_pitch": pitch
+                    }
+                    print(f"Agent Result Data (Silly): {json.dumps(result_data, indent=2)}")
+                    return pitch
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing silly mode result: {e}")
+                    return str(result)
         
         # Check for serious mode
         for tool_name, result in results:
-            if tool_name == "serious_startup_simulator" and "pitch" in result:
-                return result["pitch"]
+            if tool_name == "serious_startup_simulator":
+                # Parse the JSON string result from Galileo-formatted output
+                try:
+                    if isinstance(result, str):
+                        parsed_result = json.loads(result)
+                        pitch = parsed_result.get("pitch", "")
+                    else:
+                        # Fallback for dict format (shouldn't happen now)
+                        pitch = result.get("pitch", "")
+                    
+                    # Log full structured result to Galileo
+                    result_data = {
+                        "tool": tool_name,
+                        "mode": "serious",
+                        "full_result": result,
+                        "extracted_pitch": pitch
+                    }
+                    print(f"Agent Result Data (Serious): {json.dumps(result_data, indent=2)}")
+                    return pitch
+                except json.JSONDecodeError as e:
+                    print(f"Error parsing serious mode result: {e}")
+                    return str(result)
         
         return "No startup pitch generated."
 
@@ -143,13 +183,25 @@ class SimpleAgent(Agent):
                 news_tool = news_tool_impl()
                 async with news_tool:
                     result = await news_tool.execute(category="business", limit=5)
-                    if "articles" in result and result["articles"]:
-                        context = "Recent business news:\n"
-                        for article in result["articles"][:3]:
-                            context += f"- {article['title']} ({article['source']})\n"
-                        print("\nContext from NewsAPI:")
-                        print(context)
-                    else:
+                    # Parse JSON string result
+                    try:
+                        if isinstance(result, str):
+                            parsed_result = json.loads(result)
+                            articles = parsed_result.get("articles", [])
+                        else:
+                            # Fallback for dict format
+                            articles = result.get("articles", [])
+                        
+                        if articles:
+                            context = "Recent business news:\n"
+                            for article in articles[:3]:
+                                context += f"- {article['title']} ({article['source']})\n"
+                            print("\nContext from NewsAPI:")
+                            print(context)
+                        else:
+                            context = ""
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing NewsAPI result: {e}")
                         context = ""
             except Exception as e:
                 print(f"Warning: Could not fetch news articles: {e}")
@@ -165,13 +217,25 @@ class SimpleAgent(Agent):
                 hn_tool = hn_tool_impl()
                 async with hn_tool:
                     result = await hn_tool.execute(limit=3)
-                    if "stories" in result:
-                        context = "Recent HackerNews stories:\n"
-                        for story in result["stories"]:
-                            context += f"- {story['title']}\n"
-                        print("\nContext from HackerNews:")
-                        print(context)
-                    else:
+                    # Parse JSON string result
+                    try:
+                        if isinstance(result, str):
+                            parsed_result = json.loads(result)
+                            stories = parsed_result.get("stories", [])
+                        else:
+                            # Fallback for dict format
+                            stories = result.get("stories", [])
+                        
+                        if stories:
+                            context = "Recent HackerNews stories:\n"
+                            for story in stories:
+                                context += f"- {story['title']}\n"
+                            print("\nContext from HackerNews:")
+                            print(context)
+                        else:
+                            context = ""
+                    except json.JSONDecodeError as e:
+                        print(f"Error parsing HackerNews result: {e}")
                         context = ""
             except Exception as e:
                 print(f"Warning: Could not fetch HackerNews stories: {e}")
@@ -218,11 +282,36 @@ class SimpleAgent(Agent):
             }
             print(f"Agent Workflow Complete: {json.dumps(completion_data, indent=2)}")
             
+            # Prepare structured JSON output for Galileo workflow logging
+            workflow_result = {
+                "workflow_type": "agent_execution",
+                "agent_metadata": {
+                    "agent_id": self.agent_id,
+                    "mode": self.mode,
+                    "tools_registered": list(self.tool_registry.get_all_tools().keys())
+                },
+                "execution_summary": {
+                    "task": task,
+                    "start_time": workflow_data["start_time"],
+                    "end_time": datetime.now().isoformat(),
+                    "tools_used": [result[0] for result in results],
+                    "execution_status": "success"
+                },
+                "final_output": formatted_result,
+                "tool_results": [{"tool": tool_name, "result_preview": str(result)[:200] + "..." if len(str(result)) > 200 else str(result)} for tool_name, result in results]
+            }
+            
             # Only call on_agent_done after all tools have completed
             if self.logger:
                 await self.logger.on_agent_done(formatted_result, self.message_history)
+                # Flush traces to Galileo
+                try:
+                    self.logger.flush()
+                except Exception as e:
+                    print(f"Warning: Could not flush Galileo traces: {e}")
             
-            return formatted_result
+            # Return structured JSON string for Galileo workflow logging
+            return json.dumps(workflow_result, indent=2)
             
         except Exception as e:
             self.current_task.error = str(e)
