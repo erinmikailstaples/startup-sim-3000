@@ -1,6 +1,8 @@
-"""Simple agent implementation"""
-from agent import SimpleAgent
-from tools.text_analysis import TextAnalyzerTool
-from tools.keyword_extraction import KeywordExtractorTool
+from tools.startup_simulator import StartupSimulatorTool
 
-__all__ = ['SimpleAgent', 'TextAnalyzerTool', 'KeywordExtractorTool'] 
+__all__ = [
+    'SimpleAgent',
+    'TextAnalyzerTool',
+    'KeywordExtractorTool',
+    'StartupSimulatorTool',  
+]
