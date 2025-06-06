@@ -89,31 +89,12 @@ class SimpleAgent(Agent):
 
     async def _format_result(self, task: str, results: List[tuple[str, Dict[str, Any]]]) -> str:
         """Format the final result from tool executions"""
-        formatted_result = []
-        
-        # First, get HackerNews stories if available
-        hn_stories = None
-        for tool_name, result in results:
-            if tool_name == "hackernews_tool" and "stories" in result:
-                hn_stories = result["stories"]
-                break
-        
-        # Format HackerNews stories if available
-        if hn_stories:
-            formatted_result.append("\nContext from HackerNews:")
-            formatted_result.append("Recent HackerNews stories:")
-            for story in hn_stories[:3]:  # Show top 3 stories
-                formatted_result.append(f"- {story['title']}")
-            formatted_result.append("")
-        
-        # Then format the main result (startup pitch)
+        # Only return the startup pitch, HackerNews context is used for inspiration but not displayed
         for tool_name, result in results:
             if tool_name == "startup_simulator" and "pitch" in result:
-                formatted_result.append("\nYour silly startup pitch:")
-                formatted_result.append(result["pitch"])
-                break
+                return result["pitch"]
         
-        return "\n".join(formatted_result)
+        return "No startup pitch generated."
 
     @log(span_type="workflow", name="agent_execution")
     async def run(self, task: str) -> str:
