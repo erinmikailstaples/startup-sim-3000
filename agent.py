@@ -17,7 +17,9 @@ from agent_framework.utils.logging import AgentLogger
 from tools.text_analysis import TextAnalyzerTool
 from tools.keyword_extraction import KeywordExtractorTool
 from tools.startup_simulator import StartupSimulatorTool
+from tools.serious_startup_simulator import SeriousStartupSimulatorTool
 from tools.hackernews_tool import HackerNewsTool
+from tools.news_api_tool import NewsAPITool
 
 # Load environment variables
 load_dotenv()
@@ -32,6 +34,7 @@ class SimpleAgent(Agent):
         tool_selection_hooks: Optional[ToolSelectionHooks] = None,
         metadata: Optional[Dict[str, Any]] = None,
         llm_provider: Optional[OpenAIProvider] = None,
+        mode: str = "silly",
     ):
         super().__init__(
             verbosity=verbosity,
@@ -41,6 +44,7 @@ class SimpleAgent(Agent):
             llm_provider=llm_provider
         )
         self.state = AgentState()
+        self.mode = mode
         
         # Set up template environment
         template_dir = Path(__file__).parent / "templates"
@@ -81,17 +85,34 @@ class SimpleAgent(Agent):
             implementation=StartupSimulatorTool
         )
         
+        # Serious startup simulator
+        self.tool_registry.register(
+            metadata=SeriousStartupSimulatorTool.get_metadata(),
+            implementation=SeriousStartupSimulatorTool
+        )
+        
         # HackerNews tool
         self.tool_registry.register(
             metadata=HackerNewsTool.get_metadata(),
             implementation=HackerNewsTool
         )
+        
+        # NewsAPI tool
+        self.tool_registry.register(
+            metadata=NewsAPITool.get_metadata(),
+            implementation=NewsAPITool
+        )
 
     async def _format_result(self, task: str, results: List[tuple[str, Dict[str, Any]]]) -> str:
         """Format the final result from tool executions"""
-        # Only return the startup pitch, HackerNews context is used for inspiration but not displayed
+        # Check for silly mode first
         for tool_name, result in results:
             if tool_name == "startup_simulator" and "pitch" in result:
+                return result["pitch"]
+        
+        # Check for serious mode
+        for tool_name, result in results:
+            if tool_name == "serious_startup_simulator" and "pitch" in result:
                 return result["pitch"]
         
         return "No startup pitch generated."
@@ -99,28 +120,51 @@ class SimpleAgent(Agent):
     @log(span_type="workflow", name="agent_execution")
     async def run(self, task: str) -> str:
         """Execute the agent's task with Galileo monitoring"""
-        # First, get some context from HackerNews
-        try:
-            # Get the HackerNews tool implementation
-            hn_tool_impl = self.tool_registry.get_implementation("hackernews_tool")
-            if not hn_tool_impl:
-                raise ValueError("HackerNews tool not found in registry")
-            
-            # Create an instance and execute it
-            hn_tool = hn_tool_impl()
-            async with hn_tool:
-                result = await hn_tool.execute(limit=3)
-                if "stories" in result:
-                    context = "Recent HackerNews stories:\n"
-                    for story in result["stories"]:
-                        context += f"- {story['title']}\n"
-                    print("\nContext from HackerNews:")
-                    print(context)
-                else:
-                    context = ""
-        except Exception as e:
-            print(f"Warning: Could not fetch HackerNews stories: {e}")
-            context = ""
+        # Get context based on mode
+        if self.mode == "serious":
+            # For serious mode, get NewsAPI context
+            try:
+                news_tool_impl = self.tool_registry.get_implementation("news_api_tool")
+                if not news_tool_impl:
+                    raise ValueError("NewsAPI tool not found in registry")
+                
+                # Create an instance and execute it
+                news_tool = news_tool_impl()
+                async with news_tool:
+                    result = await news_tool.execute(category="business", limit=5)
+                    if "articles" in result and result["articles"]:
+                        context = "Recent business news:\n"
+                        for article in result["articles"][:3]:
+                            context += f"- {article['title']} ({article['source']})\n"
+                        print("\nContext from NewsAPI:")
+                        print(context)
+                    else:
+                        context = ""
+            except Exception as e:
+                print(f"Warning: Could not fetch news articles: {e}")
+                context = ""
+        else:
+            # For silly mode, get HackerNews context
+            try:
+                hn_tool_impl = self.tool_registry.get_implementation("hackernews_tool")
+                if not hn_tool_impl:
+                    raise ValueError("HackerNews tool not found in registry")
+                
+                # Create an instance and execute it
+                hn_tool = hn_tool_impl()
+                async with hn_tool:
+                    result = await hn_tool.execute(limit=3)
+                    if "stories" in result:
+                        context = "Recent HackerNews stories:\n"
+                        for story in result["stories"]:
+                            context += f"- {story['title']}\n"
+                        print("\nContext from HackerNews:")
+                        print(context)
+                    else:
+                        context = ""
+            except Exception as e:
+                print(f"Warning: Could not fetch HackerNews stories: {e}")
+                context = ""
 
         # Execute the main task by calling parent run but intercepting before final format
         try:
@@ -134,6 +178,9 @@ class SimpleAgent(Agent):
 
             if self.logger:
                 self.logger.on_agent_start(task)
+
+            # Store the context for use by tools
+            self.context_data = context
 
             # Create a plan using chain of thought reasoning
             self._current_plan = await self.plan_task(task)
