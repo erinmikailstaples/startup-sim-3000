@@ -29,12 +29,13 @@ def generate_startup():
         industry = data.get('industry', '').strip()
         audience = data.get('audience', '').strip()
         random_word = data.get('randomWord', '').strip()
+        mode = data.get('mode', 'silly').strip()  # Default to silly mode
         
         if not industry or not audience or not random_word:
             return jsonify({'error': 'All fields are required'}), 400
         
         # Run the agent asynchronously
-        result = asyncio.run(run_agent(industry, audience, random_word))
+        result = asyncio.run(run_agent(industry, audience, random_word, mode))
         
         return jsonify({'result': result})
         
@@ -42,23 +43,32 @@ def generate_startup():
         print(f"Error generating startup: {e}")
         return jsonify({'error': str(e)}), 500
 
-async def run_agent(industry: str, audience: str, random_word: str) -> str:
+async def run_agent(industry: str, audience: str, random_word: str, mode: str = "silly") -> str:
     """Run the agent to generate startup pitch"""
     # Set up LLM provider
     llm_provider = OpenAIProvider(config=LLMConfig(model="gpt-4", temperature=0.7))
     
-    # Create agent instance
-    agent = SimpleAgent(llm_provider=llm_provider)
+    # Create agent instance with mode
+    agent = SimpleAgent(llm_provider=llm_provider, mode=mode)
     
-    # Create the task description
-    task = (
-        f"First, get some inspiration from recent HackerNews stories, then "
-        f"generate a startup pitch for a {industry} company targeting {audience} "
-        f"that includes the word '{random_word}'. Make the pitch creative and "
-        f"incorporate relevant trends from the HackerNews stories."
-    )
+    # Create different task descriptions based on mode
+    if mode == "serious":
+        task = (
+            f"First, get recent business news context from NewsAPI to understand current market trends, then "
+            f"generate a professional startup business plan for a {industry} company targeting {audience} "
+            f"that incorporates the concept '{random_word}'. Use the news context to inform market analysis "
+            f"and competitive landscape. Make this extremely professional and corporate."
+        )
+    else:  # silly mode
+        task = (
+            f"First, get some inspiration from recent HackerNews stories, then "
+            f"generate a startup pitch for a {industry} company targeting {audience} "
+            f"that includes the word '{random_word}'. Make the pitch creative and "
+            f"incorporate relevant trends from the HackerNews stories."
+        )
     
-    # Run the agent within Galileo context
+    # Run the agent within Galileo context with mode-specific metadata
+    context_name = f"startup_generator_{mode}_mode"
     with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
         result = await agent.run(task)
         return result

@@ -54,3 +54,4 @@ zstandard==0.23.0
 rich
 flask
 flask-cors
+aiohttp

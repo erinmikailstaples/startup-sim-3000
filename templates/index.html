@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Startum Sim 3000 🚀</title>
+    <title>Startup Sim 3000 🚀</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,8 +13,12 @@
     <div class="game-container">
         <!-- Start Screen -->
         <div id="start-screen" class="screen active">
+            <div class="galileo-logo">
+                <img src="{{ url_for('static', filename='images/05-25-Galileo-Logo-Primary-Horizontal-Light.png') }}" alt="Galileo" />
+                <div class="powered-by">POWERED BY</div>
+            </div>
             <div class="title">
-                <h1>STARTUM SIM 3000</h1>
+                <h1>STARTUP SIM 3000</h1>
                 <div class="subtitle">The Ultimate Startup Pitch Generator</div>
             </div>
             <div class="menu">
@@ -27,14 +31,31 @@
             </div>
         </div>
 
+        <!-- Mode Selection Screen -->
+        <div id="mode-screen" class="screen">
+            <div class="mode-container">
+                <h2>SELECT MODE</h2>
+                <div class="mode-options">
+                    <div class="mode-option" id="silly-mode">
+                        <div class="mode-icon">🎭</div>
+                        <div class="mode-title">SILLY MODE</div>
+                        <div class="mode-desc">Generate absurd and fun startup ideas</div>
+                    </div>
+                    <div class="mode-option" id="serious-mode">
+                        <div class="mode-icon">💼</div>
+                        <div class="mode-title">SERIOUS MODE</div>
+                        <div class="mode-desc">Generate professional business concepts</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Input Screen -->
         <div id="input-screen" class="screen">
             <div class="header">
-                <h2>STARTUP GENERATOR v3.0</h2>
+                <h2 id="generator-title">STARTUP GENERATOR v3.0</h2>
                 <div class="stats">
-                    <span>LEVEL: 1</span>
-                    <span>LIVES: ∞</span>
-                    <span>SCORE: 0000</span>
+                    <span>MODE: READY</span>
                 </div>
             </div>
 
