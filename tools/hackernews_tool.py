@@ -1,3 +1,4 @@
+import json
 import aiohttp
 from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
@@ -171,22 +172,39 @@ class HackerNewsTool(BaseTool):
         story_id = inputs.get('story_id')
         limit = inputs.get('limit', 10)
         
+        # Log inputs as JSON
+        input_data = {
+            "story_id": story_id,
+            "limit": limit,
+            "api_source": "HackerNews"
+        }
+        print(f"HackerNews Tool Inputs: {json.dumps(input_data, indent=2)}")
+        
         try:
             if story_id is not None:
                 story = await self.get_story(story_id)
-                if story:
-                    return {"stories": [story.__dict__]}
-                return {"stories": []}
+                stories = [story.__dict__] if story else []
+            else:
+                # Get top stories
+                story_ids = await self.get_top_stories(limit=limit)
+                stories = []
+                for sid in story_ids:
+                    story = await self.get_story(sid)
+                    if story:
+                        stories.append(story.__dict__)
             
-            # Get top stories
-            story_ids = await self.get_top_stories(limit=limit)
-            stories = []
-            for sid in story_ids:
-                story = await self.get_story(sid)
-                if story:
-                    stories.append(story.__dict__)
+            # Prepare output as JSON
+            output = {
+                "stories": stories,
+                "total_stories": len(stories),
+                "limit": limit,
+                "story_id": story_id
+            }
             
-            return {"stories": stories}
+            # Log output as JSON
+            print(f"HackerNews Tool Output: {json.dumps(output, indent=2)}")
+            
+            return output
         finally:
             # Ensure session is closed
             if self._session and not self._session.closed:

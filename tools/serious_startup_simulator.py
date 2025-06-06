@@ -1,4 +1,5 @@
 import os
+import json
 from galileo.openai import openai
 from galileo import log
 from typing import Dict, Any
@@ -44,6 +45,16 @@ class SeriousStartupSimulatorTool(BaseTool):
     async def execute(self, industry: str, audience: str, random_word: str, news_context: str = "") -> Dict[str, Any]:
         """Generate a serious, professional startup pitch"""
         
+        # Log inputs as JSON
+        inputs = {
+            "industry": industry,
+            "audience": audience,
+            "random_word": random_word,
+            "news_context": news_context[:200] + "..." if len(news_context) > 200 else news_context,
+            "mode": "serious"
+        }
+        print(f"Serious Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
+        
         news_context_prompt = ""
         if news_context:
             news_context_prompt = f"\n\nRecent market context:\n{news_context}\n\nUse this context to inform your market analysis and competitive landscape."
@@ -88,12 +99,22 @@ class SeriousStartupSimulatorTool(BaseTool):
         if len(content) > 500:
             content = content[:497] + "..."
         
-        return {
+        # Prepare output as JSON
+        output = {
             "pitch": content,
+            "character_count": len(content),
+            "mode": "serious",
             "market_analysis": "",
             "financial_projections": "",
-            "competitive_landscape": ""
+            "competitive_landscape": "",
+            "timestamp": response.created if hasattr(response, 'created') else None,
+            "news_context_used": bool(news_context)
         }
+        
+        # Log output as JSON
+        print(f"Serious Startup Simulator Output: {json.dumps(output, indent=2)}")
+        
+        return output
     
     def _parse_business_pitch(self, content: str) -> Dict[str, str]:
         """Parse the business pitch into structured sections"""

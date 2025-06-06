@@ -1,4 +1,5 @@
 import os
+import json
 from galileo.openai import openai
 from galileo import log, galileo_context
 from typing import Dict, Any
@@ -40,6 +41,16 @@ class StartupSimulatorTool(BaseTool):
     @log(span_type="tool", name="startup_simulator")
     async def execute(self, industry: str, audience: str, random_word: str) -> Dict[str, Any]:
         """Generate a silly startup pitch using the LLM provider"""
+        
+        # Log inputs as JSON
+        inputs = {
+            "industry": industry,
+            "audience": audience, 
+            "random_word": random_word,
+            "mode": "silly"
+        }
+        print(f"Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
+        
         prompt = (
             f"Create a silly, creative startup pitch in 500 characters or less. "
             f"The startup is in the '{industry}' industry, targets '{audience}', and must include the word '{random_word}'. "
@@ -59,4 +70,16 @@ class StartupSimulatorTool(BaseTool):
         )
         
         pitch = response.choices[0].message.content.strip()[:500]
-        return {"pitch": pitch} 
+        
+        # Prepare output as JSON
+        output = {
+            "pitch": pitch,
+            "character_count": len(pitch),
+            "mode": "silly",
+            "timestamp": response.created if hasattr(response, 'created') else None
+        }
+        
+        # Log output as JSON
+        print(f"Startup Simulator Output: {json.dumps(output, indent=2)}")
+        
+        return output 

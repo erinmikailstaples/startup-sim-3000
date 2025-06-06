@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import asyncio
+import json
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from agent import SimpleAgent
@@ -31,11 +32,35 @@ def generate_startup():
         random_word = data.get('randomWord', '').strip()
         mode = data.get('mode', 'silly').strip()  # Default to silly mode
         
+        # Log API request as JSON
+        api_request = {
+            "endpoint": "/api/generate",
+            "method": "POST",
+            "inputs": {
+                "industry": industry,
+                "audience": audience,
+                "random_word": random_word,
+                "mode": mode
+            },
+            "timestamp": asyncio.get_event_loop().time()
+        }
+        print(f"API Request: {json.dumps(api_request, indent=2)}")
+        
         if not industry or not audience or not random_word:
             return jsonify({'error': 'All fields are required'}), 400
         
         # Run the agent asynchronously
         result = asyncio.run(run_agent(industry, audience, random_word, mode))
+        
+        # Log API response as JSON
+        api_response = {
+            "endpoint": "/api/generate",
+            "status": "success",
+            "result_length": len(result),
+            "mode": mode,
+            "timestamp": asyncio.get_event_loop().time()
+        }
+        print(f"API Response: {json.dumps(api_response, indent=2)}")
         
         return jsonify({'result': result})
         

@@ -1,4 +1,5 @@
 import os
+import json
 import aiohttp
 import asyncio
 from typing import Dict, List, Any, Optional
@@ -188,6 +189,16 @@ class NewsAPITool(BaseTool):
         country = inputs.get('country', 'us')
         limit = inputs.get('limit', 5)
         
+        # Log inputs as JSON
+        input_data = {
+            "query": query,
+            "category": category,
+            "country": country,
+            "limit": limit,
+            "api_source": "NewsAPI"
+        }
+        print(f"NewsAPI Tool Inputs: {json.dumps(input_data, indent=2)}")
+        
         try:
             if query:
                 # Search for specific articles
@@ -196,10 +207,20 @@ class NewsAPITool(BaseTool):
                 # Get top headlines
                 articles = await self.get_top_headlines(country, category, limit)
             
-            return {
+            # Prepare output as JSON
+            output = {
                 "articles": [article.__dict__ for article in articles],
-                "total_results": len(articles)
+                "total_results": len(articles),
+                "query_type": "search" if query else "headlines",
+                "category": category,
+                "country": country,
+                "limit": limit
             }
+            
+            # Log output as JSON
+            print(f"NewsAPI Tool Output: {json.dumps(output, indent=2)}")
+            
+            return output
             
         finally:
             # Ensure session is closed
