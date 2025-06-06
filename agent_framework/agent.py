@@ -370,7 +370,10 @@ class Agent(ABC):
             elif self.state.has_variable(input_name):
                 mapped_inputs[input_name] = self.state.get_variable(input_name)
             elif input_schema.get("type") == "string":
-                mapped_inputs[input_name] = task
+                if input_name == "news_context" and hasattr(self, 'context_data'):
+                    mapped_inputs[input_name] = getattr(self, 'context_data', "")
+                else:
+                    mapped_inputs[input_name] = task
         
         # For tools with no required inputs, return empty dict (all optional)
         required_fields = tool.input_schema.get("required", [])

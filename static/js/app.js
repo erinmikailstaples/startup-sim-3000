@@ -2,17 +2,26 @@
 class StartumSim {
     constructor() {
         this.currentScreen = 'start-screen';
+        this.selectedMode = null;
         this.inputs = {
             industry: '',
             audience: '',
             randomWord: ''
         };
-        this.loadingSteps = [
-            '► Fetching HackerNews trends...',
-            '► Analyzing market data...',
-            '► Generating pitch...',
-            '► Finalizing results...'
-        ];
+        this.loadingSteps = {
+            silly: [
+                '► Fetching HackerNews trends...',
+                '► Analyzing startup ecosystem...',
+                '► Generating silly pitch...',
+                '► Finalizing absurd results...'
+            ],
+            serious: [
+                '► Fetching market news...',
+                '► Analyzing competitive landscape...',
+                '► Generating business plan...',
+                '► Finalizing professional pitch...'
+            ]
+        };
         
         this.init();
     }
@@ -25,8 +34,17 @@ class StartumSim {
     bindEvents() {
         // Start button
         document.getElementById('start-button').addEventListener('click', () => {
-            this.showScreen('input-screen');
+            this.showScreen('mode-screen');
             this.playSound('beep');
+        });
+        
+        // Mode selection
+        document.getElementById('silly-mode').addEventListener('click', () => {
+            this.selectMode('silly');
+        });
+        
+        document.getElementById('serious-mode').addEventListener('click', () => {
+            this.selectMode('serious');
         });
         
         // Generate button
@@ -74,7 +92,7 @@ class StartumSim {
         switch(e.key) {
             case 'Enter':
                 if (this.currentScreen === 'start-screen') {
-                    this.showScreen('input-screen');
+                    this.showScreen('mode-screen');
                     this.playSound('beep');
                 } else if (this.currentScreen === 'input-screen') {
                     this.handleGenerate();
@@ -88,6 +106,30 @@ class StartumSim {
         }
     }
     
+    selectMode(mode) {
+        this.selectedMode = mode;
+        
+        // Update visual selection
+        document.querySelectorAll('.mode-option').forEach(option => {
+            option.classList.remove('selected');
+        });
+        document.getElementById(`${mode}-mode`).classList.add('selected');
+        
+        // Update the generator title and mode status
+        const title = mode === 'serious' ? 'PROFESSIONAL STARTUP GENERATOR v3.0' : 'SILLY STARTUP GENERATOR v3.0';
+        document.getElementById('generator-title').textContent = title;
+        
+        // Update mode status
+        const modeStatus = mode === 'serious' ? 'MODE: PROFESSIONAL' : 'MODE: SILLY';
+        document.querySelector('.stats span').textContent = modeStatus;
+        
+        // Go to input screen after a brief delay
+        setTimeout(() => {
+            this.showScreen('input-screen');
+            this.playSound('beep');
+        }, 500);
+    }
+
     showScreen(screenId) {
         // Hide all screens
         document.querySelectorAll('.screen').forEach(screen => {
@@ -125,12 +167,17 @@ class StartumSim {
         this.startLoadingAnimation();
         
         try {
+            const requestData = {
+                ...this.inputs,
+                mode: this.selectedMode || 'silly'
+            };
+            
             const response = await fetch('/api/generate', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(this.inputs)
+                body: JSON.stringify(requestData)
             });
             
             const data = await response.json();
@@ -155,6 +202,14 @@ class StartumSim {
     startLoadingAnimation() {
         const progressBar = document.querySelector('.loading-progress');
         const steps = document.querySelectorAll('.loading-step');
+        
+        // Update loading steps based on mode
+        const currentSteps = this.loadingSteps[this.selectedMode || 'silly'];
+        steps.forEach((step, index) => {
+            if (currentSteps[index]) {
+                step.textContent = currentSteps[index];
+            }
+        });
         
         // Reset animation
         progressBar.style.width = '0%';
@@ -232,14 +287,23 @@ class StartumSim {
             audience: '',
             randomWord: ''
         };
+        this.selectedMode = null;
         
         // Clear inputs
         document.getElementById('industry').value = '';
         document.getElementById('audience').value = '';
         document.getElementById('randomWord').value = '';
         
+        // Clear mode selection
+        document.querySelectorAll('.mode-option').forEach(option => {
+            option.classList.remove('selected');
+        });
+        
+        // Reset mode status
+        document.querySelector('.stats span').textContent = 'MODE: READY';
+        
         this.updateGenerateButton();
-        this.showScreen('input-screen');
+        this.showScreen('mode-screen');
         this.playSound('beep');
     }
     
