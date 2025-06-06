@@ -1,7 +1,8 @@
 # AGENT.md - Startum Sim 3000 Development Guide
 
 ## Run Commands
-- **Start app**: `python run_startup_sim.py`
+- **Start CLI app**: `python run_startup_sim.py`
+- **Start web app**: `python web_server.py` (then visit http://localhost:2021)
 - **Test**: No test framework configured yet
 - **Lint**: No linter configured yet  
 - **Type check**: No type checker configured yet
