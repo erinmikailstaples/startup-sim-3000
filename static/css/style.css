@@ -1,4 +1,16 @@
 /* 8-bit Game Styling */
+:root {
+    --blue: #3498db;
+    --red: #e74c3c;
+    --orange: #f39c12;
+    --orange-red: #e67e22;
+    --green: #2ecc71;
+    --navy: #1a1a2e;
+    --light: #ecf0f1;
+    --gray: #95a5a6;
+    --dark-blue: #2c3e50;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -7,8 +19,8 @@
 
 body {
     font-family: 'Press Start 2P', monospace;
-    background: linear-gradient(45deg, #0f0f23, #1a1a3a);
-    color: #00ff00;
+    background: linear-gradient(45deg, var(--navy), var(--dark-blue));
+    color: var(--light);
     overflow: hidden;
     height: 100vh;
     user-select: none;
@@ -19,9 +31,9 @@ body {
     height: 100vh;
     position: relative;
     background: 
-        radial-gradient(circle at 25% 25%, #004400 0%, transparent 50%),
-        radial-gradient(circle at 75% 75%, #440044 0%, transparent 50%),
-        linear-gradient(45deg, #000011, #001122);
+        radial-gradient(circle at 25% 25%, rgba(52, 152, 219, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 75% 75%, rgba(231, 76, 60, 0.1) 0%, transparent 50%),
+        linear-gradient(45deg, var(--navy), var(--dark-blue));
     background-size: 100px 100px, 100px 100px, 100% 100%;
     animation: backgroundShift 20s ease-in-out infinite;
 }
@@ -52,23 +64,23 @@ body {
 /* Start Screen */
 .title h1 {
     font-size: clamp(2rem, 8vw, 4rem);
-    color: #00ffff;
+    color: var(--blue);
     text-shadow: 
-        2px 2px 0px #0088aa,
-        4px 4px 0px #004466,
-        6px 6px 0px #002233;
+        2px 2px 0px var(--dark-blue),
+        4px 4px 0px var(--navy),
+        6px 6px 0px #000;
     margin-bottom: 1rem;
     animation: glow 2s ease-in-out infinite alternate;
 }
 
 @keyframes glow {
-    from { text-shadow: 2px 2px 0px #0088aa, 4px 4px 0px #004466, 6px 6px 0px #002233, 0 0 20px #00ffff; }
-    to { text-shadow: 2px 2px 0px #0088aa, 4px 4px 0px #004466, 6px 6px 0px #002233, 0 0 30px #00ffff, 0 0 40px #00ffff; }
+    from { text-shadow: 2px 2px 0px var(--dark-blue), 4px 4px 0px var(--navy), 6px 6px 0px #000, 0 0 20px var(--blue); }
+    to { text-shadow: 2px 2px 0px var(--dark-blue), 4px 4px 0px var(--navy), 6px 6px 0px #000, 0 0 30px var(--blue), 0 0 40px var(--blue); }
 }
 
 .subtitle {
     font-size: clamp(0.5rem, 2vw, 1rem);
-    color: #ffff00;
+    color: var(--orange);
     margin-bottom: 3rem;
 }
 
@@ -78,7 +90,7 @@ body {
 
 .menu-item {
     font-size: clamp(0.8rem, 2.5vw, 1.2rem);
-    color: #ffffff;
+    color: var(--light);
     margin: 1rem 0;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -86,8 +98,8 @@ body {
 
 .menu-item.active,
 .menu-item:hover {
-    color: #00ff00;
-    text-shadow: 0 0 10px #00ff00;
+    color: var(--green);
+    text-shadow: 0 0 10px var(--green);
     transform: scale(1.1);
 }
 
@@ -95,7 +107,7 @@ body {
     position: absolute;
     bottom: 2rem;
     font-size: clamp(0.6rem, 1.5vw, 0.8rem);
-    color: #ffff00;
+    color: var(--orange);
 }
 
 .blink {
@@ -121,14 +133,14 @@ body {
 
 .header h2 {
     font-size: clamp(1rem, 3vw, 1.5rem);
-    color: #00ffff;
+    color: var(--blue);
 }
 
 .stats {
     display: flex;
     gap: 2rem;
     font-size: clamp(0.6rem, 1.5vw, 0.8rem);
-    color: #ffff00;
+    color: var(--orange);
 }
 
 .form-container {
@@ -145,9 +157,9 @@ body {
 .input-group label {
     display: block;
     font-size: clamp(0.8rem, 2vw, 1rem);
-    color: #00ff00;
+    color: var(--green);
     margin-bottom: 0.5rem;
-    text-shadow: 0 0 10px #00ff00;
+    text-shadow: 0 0 10px var(--green);
 }
 
 .input-group input {
@@ -155,26 +167,26 @@ body {
     padding: 1rem;
     font-family: 'Press Start 2P', monospace;
     font-size: clamp(0.6rem, 1.5vw, 0.8rem);
-    background: #000033;
-    border: 2px solid #00ff00;
-    color: #00ff00;
+    background: var(--navy);
+    border: 2px solid var(--green);
+    color: var(--green);
     outline: none;
     box-shadow: 
-        inset 0 0 10px rgba(0, 255, 0, 0.2),
-        0 0 20px rgba(0, 255, 0, 0.3);
+        inset 0 0 10px rgba(46, 204, 113, 0.2),
+        0 0 20px rgba(46, 204, 113, 0.3);
     transition: all 0.3s ease;
 }
 
 .input-group input:focus {
-    border-color: #00ffff;
+    border-color: var(--blue);
     box-shadow: 
-        inset 0 0 10px rgba(0, 255, 255, 0.3),
-        0 0 30px rgba(0, 255, 255, 0.5);
-    color: #00ffff;
+        inset 0 0 10px rgba(52, 152, 219, 0.3),
+        0 0 30px rgba(52, 152, 219, 0.5);
+    color: var(--blue);
 }
 
 .input-group input::placeholder {
-    color: #006600;
+    color: var(--gray);
 }
 
 .controls {
@@ -184,7 +196,7 @@ body {
 
 .control-hint {
     font-size: clamp(0.5rem, 1.2vw, 0.6rem);
-    color: #888888;
+    color: var(--gray);
     margin-bottom: 1rem;
 }
 
@@ -192,14 +204,14 @@ body {
     font-family: 'Press Start 2P', monospace;
     font-size: clamp(0.7rem, 1.8vw, 1rem);
     padding: 1rem 2rem;
-    background: linear-gradient(45deg, #00aa00, #00ff00);
-    border: 2px solid #00ff00;
-    color: #000000;
+    background: linear-gradient(45deg, var(--green), #2ecc71);
+    border: 2px solid var(--green);
+    color: var(--navy);
     cursor: pointer;
     text-transform: uppercase;
     box-shadow: 
-        0 4px 0 #006600,
-        0 6px 0 #004400,
+        0 4px 0 #27ae60,
+        0 6px 0 #229954,
         0 8px 20px rgba(0, 0, 0, 0.5);
     transition: all 0.2s ease;
     margin: 0.5rem;
@@ -209,33 +221,33 @@ body {
 .pixel-button:hover {
     transform: translateY(-2px);
     box-shadow: 
-        0 6px 0 #006600,
-        0 8px 0 #004400,
+        0 6px 0 #27ae60,
+        0 8px 0 #229954,
         0 12px 25px rgba(0, 0, 0, 0.7);
 }
 
 .pixel-button:active {
     transform: translateY(2px);
     box-shadow: 
-        0 2px 0 #006600,
-        0 4px 0 #004400,
+        0 2px 0 #27ae60,
+        0 4px 0 #229954,
         0 6px 15px rgba(0, 0, 0, 0.3);
 }
 
 .pixel-button.secondary {
-    background: linear-gradient(45deg, #666666, #999999);
-    border-color: #999999;
-    color: #000000;
+    background: linear-gradient(45deg, var(--orange), #f39c12);
+    border-color: var(--orange);
+    color: var(--navy);
     box-shadow: 
-        0 4px 0 #444444,
-        0 6px 0 #222222,
+        0 4px 0 #e67e22,
+        0 6px 0 #d68910,
         0 8px 20px rgba(0, 0, 0, 0.5);
 }
 
 .pixel-button.secondary:hover {
     box-shadow: 
-        0 6px 0 #444444,
-        0 8px 0 #222222,
+        0 6px 0 #e67e22,
+        0 8px 0 #d68910,
         0 12px 25px rgba(0, 0, 0, 0.7);
 }
 
@@ -247,7 +259,7 @@ body {
 
 .loading-container h2 {
     font-size: clamp(1.2rem, 3vw, 2rem);
-    color: #ffff00;
+    color: var(--orange);
     margin-bottom: 2rem;
     animation: pulse 1s infinite;
 }
@@ -260,8 +272,8 @@ body {
 .loading-bar {
     width: 100%;
     height: 20px;
-    background: #000033;
-    border: 2px solid #00ff00;
+    background: var(--navy);
+    border: 2px solid var(--green);
     margin: 2rem 0;
     position: relative;
     overflow: hidden;
@@ -269,7 +281,7 @@ body {
 
 .loading-progress {
     height: 100%;
-    background: linear-gradient(90deg, #00ff00, #00ffff, #00ff00);
+    background: linear-gradient(90deg, var(--green), var(--blue), var(--green));
     width: 0%;
     animation: loadingProgress 3s ease-in-out infinite;
 }
@@ -286,13 +298,13 @@ body {
 
 .loading-step {
     font-size: clamp(0.7rem, 1.8vw, 1rem);
-    color: #666666;
+    color: var(--gray);
     margin: 0.5rem 0;
     transition: color 0.5s ease;
 }
 
 .loading-step.active {
-    color: #00ff00;
+    color: var(--green);
     animation: typewriter 2s ease-in-out;
 }
 
@@ -310,8 +322,8 @@ body {
 .pixel-spinner {
     width: 40px;
     height: 40px;
-    border: 4px solid #333333;
-    border-top: 4px solid #00ff00;
+    border: 4px solid var(--gray);
+    border-top: 4px solid var(--green);
     border-radius: 50%;
     animation: spin 1s linear infinite;
 }
@@ -329,7 +341,7 @@ body {
 
 .result-container h2 {
     font-size: clamp(1.5rem, 4vw, 2.5rem);
-    color: #00ffff;
+    color: var(--blue);
     margin-bottom: 2rem;
     animation: celebration 2s ease-in-out;
 }
@@ -341,22 +353,25 @@ body {
 }
 
 .result-content {
-    background: rgba(0, 50, 0, 0.8);
-    border: 2px solid #00ff00;
+    background: rgba(26, 26, 46, 0.9);
+    border: 2px solid var(--green);
     padding: 2rem;
     margin: 2rem 0;
     border-radius: 10px;
     box-shadow: 
-        inset 0 0 20px rgba(0, 255, 0, 0.2),
-        0 0 30px rgba(0, 255, 0, 0.3);
+        inset 0 0 20px rgba(46, 204, 113, 0.2),
+        0 0 30px rgba(46, 204, 113, 0.3);
 }
 
 .result-text {
-    font-size: clamp(0.7rem, 1.8vw, 1rem);
-    color: #ffffff;
-    line-height: 1.6;
+    font-family: 'Segoe UI', 'Arial', sans-serif;
+    font-size: clamp(1rem, 2.2vw, 1.3rem);
+    color: var(--light);
+    line-height: 1.8;
     text-align: left;
     white-space: pre-line;
+    font-weight: 400;
+    letter-spacing: 0.3px;
 }
 
 .result-actions {
@@ -374,7 +389,7 @@ body {
 
 .error-container h2 {
     font-size: clamp(1.5rem, 4vw, 2.5rem);
-    color: #ff0000;
+    color: var(--red);
     margin-bottom: 2rem;
     animation: shake 0.5s ease-in-out infinite;
 }
@@ -387,11 +402,11 @@ body {
 
 .error-message {
     font-size: clamp(0.8rem, 2vw, 1rem);
-    color: #ffaaaa;
+    color: var(--light);
     margin-bottom: 2rem;
     padding: 1rem;
-    background: rgba(100, 0, 0, 0.3);
-    border: 1px solid #ff0000;
+    background: rgba(231, 76, 60, 0.2);
+    border: 1px solid var(--red);
     border-radius: 5px;
 }
 
@@ -431,14 +446,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: #000033;
+    background: var(--navy);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: #00ff00;
+    background: var(--green);
     border-radius: 6px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #00ffff;
+    background: var(--blue);
 }
