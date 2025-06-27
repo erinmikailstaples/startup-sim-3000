@@ -1,9 +1,9 @@
 import os
+import json
 import aiohttp
 import asyncio
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from galileo import log, galileo_context
 from agent_framework.models import ToolMetadata
 from agent_framework.tools.base import BaseTool
 from dotenv import load_dotenv
@@ -180,13 +180,22 @@ class NewsAPITool(BaseTool):
             print(f"Error searching articles: {str(e)}")
             return []
 
-    @log(span_type="tool", name="news_api")
-    async def execute(self, **inputs: Any) -> Dict[str, Any]:
+    async def execute(self, **inputs: Any) -> str:
         """Execute the NewsAPI tool"""
         query = inputs.get('query')
         category = inputs.get('category')
         country = inputs.get('country', 'us')
         limit = inputs.get('limit', 5)
+        
+        # Log inputs as JSON
+        input_data = {
+            "query": query,
+            "category": category,
+            "country": country,
+            "limit": limit,
+            "api_source": "NewsAPI"
+        }
+        print(f"NewsAPI Tool Inputs: {json.dumps(input_data, indent=2)}")
         
         try:
             if query:
@@ -196,10 +205,42 @@ class NewsAPITool(BaseTool):
                 # Get top headlines
                 articles = await self.get_top_headlines(country, category, limit)
             
-            return {
+            # Prepare output as JSON
+            output = {
                 "articles": [article.__dict__ for article in articles],
-                "total_results": len(articles)
+                "total_results": len(articles),
+                "query_type": "search" if query else "headlines",
+                "category": category,
+                "country": country,
+                "limit": limit
             }
+            
+            # Log output as JSON to console and for Galileo observability
+            output_log = {
+                "tool_execution": "news_api_tool",
+                "inputs": input_data,
+                "output": output,
+                "metadata": {
+                    "total_results": output["total_results"],
+                    "query_type": output["query_type"],
+                    "category": output["category"],
+                    "country": output["country"],
+                    "limit": output["limit"],
+                    "api_source": "NewsAPI"
+                }
+            }
+            print(f"NewsAPI Tool Output: {json.dumps(output_log, indent=2)}")
+            
+            # Return JSON string for proper Galileo logging display
+            galileo_output = {
+                "tool_result": "news_api_tool",
+                "formatted_output": json.dumps(output, indent=2),
+                "articles": output["articles"],
+                "metadata": output
+            }
+            
+            # Return as formatted JSON string for Galileo
+            return json.dumps(galileo_output, indent=2)
             
         finally:
             # Ensure session is closed

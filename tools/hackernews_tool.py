@@ -1,9 +1,9 @@
+import json
 import aiohttp
 from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
 from datetime import datetime
 import time
-from galileo import log, galileo_context
 from agent_framework.models import ToolMetadata
 from agent_framework.tools.base import BaseTool
 
@@ -165,28 +165,63 @@ class HackerNewsTool(BaseTool):
             "type": story.type
         }
 
-    @log(span_type="tool", name="hackernews_tool")
-    async def execute(self, **inputs: Any) -> Dict[str, Any]:
+    async def execute(self, **inputs: Any) -> str:
         """Execute the HackerNews tool"""
         story_id = inputs.get('story_id')
         limit = inputs.get('limit', 10)
         
+        # Log inputs as JSON
+        input_data = {
+            "story_id": story_id,
+            "limit": limit,
+            "api_source": "HackerNews"
+        }
+        print(f"HackerNews Tool Inputs: {json.dumps(input_data, indent=2)}")
+        
         try:
             if story_id is not None:
                 story = await self.get_story(story_id)
-                if story:
-                    return {"stories": [story.__dict__]}
-                return {"stories": []}
+                stories = [story.__dict__] if story else []
+            else:
+                # Get top stories
+                story_ids = await self.get_top_stories(limit=limit)
+                stories = []
+                for sid in story_ids:
+                    story = await self.get_story(sid)
+                    if story:
+                        stories.append(story.__dict__)
             
-            # Get top stories
-            story_ids = await self.get_top_stories(limit=limit)
-            stories = []
-            for sid in story_ids:
-                story = await self.get_story(sid)
-                if story:
-                    stories.append(story.__dict__)
+            # Prepare output as JSON
+            output = {
+                "stories": stories,
+                "total_stories": len(stories),
+                "limit": limit,
+                "story_id": story_id
+            }
             
-            return {"stories": stories}
+            # Log output as JSON to console and for Galileo observability
+            output_log = {
+                "tool_execution": "hackernews_tool",
+                "inputs": input_data,
+                "output": output,
+                "metadata": {
+                    "total_stories": output["total_stories"],
+                    "limit": output["limit"],
+                    "api_source": "HackerNews"
+                }
+            }
+            print(f"HackerNews Tool Output: {json.dumps(output_log, indent=2)}")
+            
+            # Return JSON string for proper Galileo logging display
+            galileo_output = {
+                "tool_result": "hackernews_tool",
+                "formatted_output": json.dumps(output, indent=2),
+                "stories": output["stories"],
+                "metadata": output
+            }
+            
+            # Return as formatted JSON string for Galileo
+            return json.dumps(galileo_output, indent=2)
         finally:
             # Ensure session is closed
             if self._session and not self._session.closed:

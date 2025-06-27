@@ -28,6 +28,7 @@ class StartumSim {
     
     init() {
         this.bindEvents();
+        this.initTheme();
         this.playStartupSound();
     }
     
@@ -67,6 +68,11 @@ class StartumSim {
             this.showScreen('input-screen');
         });
         
+        // Theme toggle button
+        document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+            this.toggleTheme();
+        });
+        
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
             this.handleKeypress(e);
@@ -101,6 +107,14 @@ class StartumSim {
             case 'Escape':
                 if (this.currentScreen !== 'start-screen') {
                     this.resetGame();
+                }
+                break;
+            case 't':
+            case 'T':
+                // Toggle theme with 't' key
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    this.toggleTheme();
                 }
                 break;
         }
@@ -403,6 +417,39 @@ class StartumSim {
         setTimeout(() => {
             this.playSound('power-up');
         }, 500);
+    }
+    
+    initTheme() {
+        // Get saved theme or default to dark
+        const savedTheme = localStorage.getItem('startup-sim-theme') || 'dark';
+        this.setTheme(savedTheme);
+    }
+    
+    toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        this.setTheme(newTheme);
+        this.playSound('beep');
+    }
+    
+    setTheme(theme) {
+        // Update document attribute
+        if (theme === 'light') {
+            document.documentElement.setAttribute('data-theme', 'light');
+        } else {
+            document.documentElement.removeAttribute('data-theme');
+        }
+        
+        // Update theme toggle button icon
+        const themeIcon = document.querySelector('.theme-icon');
+        if (themeIcon) {
+            themeIcon.textContent = theme === 'dark' ? '🌙' : '☀️';
+        }
+        
+        // Save preference
+        localStorage.setItem('startup-sim-theme', theme);
+        
+        console.log(`Theme switched to: ${theme}`);
     }
 }
 
