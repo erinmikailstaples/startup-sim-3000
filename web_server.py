@@ -7,7 +7,7 @@ from flask_cors import CORS
 from agent import SimpleAgent
 from agent_framework.llm.openai_provider import OpenAIProvider
 from agent_framework.llm.models import LLMConfig
-from galileo import galileo_context
+
 import os
 from dotenv import load_dotenv
 
@@ -104,11 +104,9 @@ async def run_agent(industry: str, audience: str, random_word: str, mode: str = 
             f"incorporate relevant trends from the HackerNews stories."
         )
     
-    # Run the agent within Galileo context with mode-specific metadata
-    context_name = f"startup_generator_{mode}_mode"
-    with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
-        result = await agent.run(task)
-        return result
+    # Run the agent with individual parameters (Galileo logging handled internally by agent and tools)
+    result = await agent.run(task, industry=industry, audience=audience, random_word=random_word)
+    return result
 
 if __name__ == '__main__':
     # Ensure Galileo environment variables are set

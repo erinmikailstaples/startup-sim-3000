@@ -7,7 +7,7 @@ import json
 from uuid import uuid4
 from datetime import datetime
 from dotenv import load_dotenv
-from galileo import galileo_context, log
+from galileo import GalileoLogger
 
 from agent_framework.agent import Agent
 from agent_framework.state import AgentState
@@ -46,6 +46,11 @@ class SimpleAgent(Agent):
         )
         self.state = AgentState()
         self.mode = mode
+        
+        # Initialize Galileo Logger
+        project_id = os.getenv("GALILEO_PROJECT_ID", "erin-custom-metric")
+        log_stream = os.getenv("GALILEO_LOG_STREAM", "my_log_stream")
+        self.galileo_logger = GalileoLogger(project=project_id, log_stream=log_stream)
         
         # Set up template environment
         template_dir = Path(__file__).parent / "templates"
@@ -158,9 +163,23 @@ class SimpleAgent(Agent):
         
         return "No startup pitch generated."
 
-    @log(span_type="workflow", name="agent_execution")
-    async def run(self, task: str) -> str:
+    async def run(self, task: str, industry: str = "", audience: str = "", random_word: str = "") -> str:
         """Execute the agent's task with Galileo monitoring"""
+        
+        # Store parameters for tool execution
+        self.task_parameters = {
+            "industry": industry,
+            "audience": audience, 
+            "random_word": random_word
+        }
+        
+        # Start Galileo trace with structured input
+        trace_input = {
+            "user_task": task,
+            "agent_mode": self.mode,
+            "agent_id": self.agent_id,
+            "timestamp": datetime.now().isoformat()
+        }
         
         # Log workflow start as JSON
         workflow_data = {
@@ -171,6 +190,23 @@ class SimpleAgent(Agent):
             "tools_registered": list(self.tool_registry.get_all_tools().keys())
         }
         print(f"Agent Workflow Start: {json.dumps(workflow_data, indent=2)}")
+        
+        # Start Galileo trace with string metadata
+        try:
+            trace = self.galileo_logger.start_trace(
+                input=json.dumps(trace_input, indent=2),
+                name=f"Startup Generator - {self.mode.title()} Mode",
+                metadata={
+                    "agent_id": str(self.agent_id),
+                    "mode": str(self.mode),
+                    "tools_count": str(len(self.tool_registry.get_all_tools().keys()))
+                },
+                tags=["startup-generator", f"mode-{self.mode}", "agent-workflow"]
+            )
+            print(f"Galileo trace started successfully for agent workflow")
+        except Exception as e:
+            print(f"Warning: Could not start Galileo trace for agent: {e}")
+            trace = None
         # Get context based on mode
         if self.mode == "serious":
             # For serious mode, get NewsAPI context
@@ -263,7 +299,30 @@ class SimpleAgent(Agent):
             # Execute each step in the plan to get raw results
             results = []
             for step in self._current_plan.execution_plan:
+                tool_name = step["tool"]
+                
+                # Add LLM span for each tool execution
+                llm_input = {
+                    "tool": tool_name,
+                    "task": task,
+                    "mode": self.mode,
+                    "step_details": step
+                }
+                
                 result = await self._execute_step(step, task, self._current_plan)
+                
+                # Add LLM span to Galileo trace (only if trace was created successfully)
+                if trace is not None:
+                    try:
+                        self.galileo_logger.add_llm_span(
+                            input=json.dumps(llm_input, indent=2),
+                            output=str(result)[:1000] + "..." if len(str(result)) > 1000 else str(result),
+                            model="gpt-4",  # The underlying model used by tools
+                            name=f"{tool_name} Execution"
+                        )
+                    except Exception as e:
+                        print(f"Warning: Could not add LLM span for {tool_name}: {e}")
+                
                 results.append((step["tool"], result))
             
             # Format the results using our custom HN style
@@ -301,14 +360,23 @@ class SimpleAgent(Agent):
                 "tool_results": [{"tool": tool_name, "result_preview": str(result)[:200] + "..." if len(str(result)) > 200 else str(result)} for tool_name, result in results]
             }
             
+            # Conclude Galileo trace with final output (this is key for custom metrics)
+            if trace is not None:
+                try:
+                    self.galileo_logger.conclude(output=json.dumps(workflow_result, indent=2))
+                    print(f"Galileo trace concluded successfully for agent workflow")
+                except Exception as e:
+                    print(f"Warning: Could not conclude Galileo trace: {e}")
+            
+            # Flush traces to Galileo
+            try:
+                self.galileo_logger.flush()
+            except Exception as e:
+                print(f"Warning: Could not flush Galileo traces: {e}")
+            
             # Only call on_agent_done after all tools have completed
             if self.logger:
                 await self.logger.on_agent_done(formatted_result, self.message_history)
-                # Flush traces to Galileo
-                try:
-                    self.logger.flush()
-                except Exception as e:
-                    print(f"Warning: Could not flush Galileo traces: {e}")
             
             # Return structured JSON string for Galileo workflow logging
             return json.dumps(workflow_result, indent=2)

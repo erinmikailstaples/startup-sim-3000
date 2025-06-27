@@ -4,7 +4,6 @@ from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
 from datetime import datetime
 import time
-from galileo import log, galileo_context
 from agent_framework.models import ToolMetadata
 from agent_framework.tools.base import BaseTool
 
@@ -166,8 +165,7 @@ class HackerNewsTool(BaseTool):
             "type": story.type
         }
 
-    @log(span_type="tool", name="hackernews_tool")
-    async def execute(self, **inputs: Any) -> Dict[str, Any]:
+    async def execute(self, **inputs: Any) -> str:
         """Execute the HackerNews tool"""
         story_id = inputs.get('story_id')
         limit = inputs.get('limit', 10)

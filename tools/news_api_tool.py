@@ -4,7 +4,6 @@ import aiohttp
 import asyncio
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
-from galileo import log, galileo_context
 from agent_framework.models import ToolMetadata
 from agent_framework.tools.base import BaseTool
 from dotenv import load_dotenv
@@ -181,8 +180,7 @@ class NewsAPITool(BaseTool):
             print(f"Error searching articles: {str(e)}")
             return []
 
-    @log(span_type="tool", name="news_api")
-    async def execute(self, **inputs: Any) -> Dict[str, Any]:
+    async def execute(self, **inputs: Any) -> str:
         """Execute the NewsAPI tool"""
         query = inputs.get('query')
         category = inputs.get('category')
