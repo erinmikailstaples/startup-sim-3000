@@ -372,6 +372,10 @@ class Agent(ABC):
             elif input_schema.get("type") == "string":
                 if input_name == "news_context" and hasattr(self, 'context_data'):
                     mapped_inputs[input_name] = getattr(self, 'context_data', "")
+                elif input_name == "hn_context" and hasattr(self, 'context_data'):
+                    mapped_inputs[input_name] = getattr(self, 'context_data', "")
+                elif hasattr(self, 'task_parameters') and input_name in self.task_parameters:
+                    mapped_inputs[input_name] = self.task_parameters[input_name]
                 else:
                     mapped_inputs[input_name] = task
         

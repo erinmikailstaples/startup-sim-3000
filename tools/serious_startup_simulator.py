@@ -1,7 +1,7 @@
 import os
 import json
 from galileo.openai import openai
-from galileo import log
+from galileo import GalileoLogger
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
@@ -13,6 +13,13 @@ load_dotenv()
 
 class SeriousStartupSimulatorTool(BaseTool):
     """Tool for generating serious, professional startup pitches"""
+    
+    def __init__(self):
+        super().__init__()
+        # Initialize Galileo Logger
+        project_id = os.getenv("GALILEO_PROJECT_ID", "erin-custom-metric")
+        log_stream = os.getenv("GALILEO_LOG_STREAM", "my_log_stream")
+        self.galileo_logger = GalileoLogger(project=project_id, log_stream=log_stream)
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
@@ -36,8 +43,7 @@ class SeriousStartupSimulatorTool(BaseTool):
             }
         )
 
-    @log(span_type="tool", name="serious_startup_simulator")
-    async def execute(self, industry: str, audience: str, random_word: str, news_context: str = "") -> Dict[str, Any]:
+    async def execute(self, industry: str, audience: str, random_word: str, news_context: str = "") -> str:
         """Generate a serious, professional startup pitch"""
         
         # Log inputs as JSON
@@ -49,6 +55,23 @@ class SeriousStartupSimulatorTool(BaseTool):
             "mode": "serious"
         }
         print(f"Serious Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
+        
+        # Start Galileo trace for this tool with string metadata
+        try:
+            trace = self.galileo_logger.start_trace(
+                input=json.dumps(inputs, indent=2),
+                name="Serious Startup Pitch Generation",
+                metadata={
+                    "tool": "serious_startup_simulator",
+                    "mode": "serious",
+                    "has_news_context": str(bool(news_context))
+                },
+                tags=["startup-generator", "serious-mode", "business-pitch"]
+            )
+            print(f"Galileo trace started successfully for serious startup simulator")
+        except Exception as e:
+            print(f"Warning: Could not start Galileo trace for serious simulator: {e}")
+            trace = None
         
         news_context_prompt = ""
         if news_context:
@@ -81,7 +104,7 @@ class SeriousStartupSimulatorTool(BaseTool):
         # Create messages
         messages = [{"role": "user", "content": prompt}]
         
-        # Execute the API call (Galileo context inherited from parent workflow)
+        # Execute the API call
         response = await client.chat.completions.create(
             messages=messages,
             model="gpt-4",
@@ -89,6 +112,18 @@ class SeriousStartupSimulatorTool(BaseTool):
         )
         
         content = response.choices[0].message.content.strip()
+        
+        # Add LLM span to Galileo trace (only if trace was created successfully)
+        if trace is not None:
+            try:
+                self.galileo_logger.add_llm_span(
+                    input=prompt,
+                    output=content,
+                    model="gpt-4",
+                    name="Serious Pitch Generation"
+                )
+            except Exception as e:
+                print(f"Warning: Could not add LLM span for serious simulator: {e}")
         
         # Ensure it's under 500 characters
         if len(content) > 500:
@@ -127,6 +162,20 @@ class SeriousStartupSimulatorTool(BaseTool):
             "pitch": output["pitch"],
             "metadata": output
         }
+        
+        # Conclude Galileo trace with final output (only if trace was created successfully)
+        if trace is not None:
+            try:
+                self.galileo_logger.conclude(output=json.dumps(galileo_output, indent=2))
+                print(f"Galileo trace concluded successfully for serious startup simulator")
+            except Exception as e:
+                print(f"Warning: Could not conclude Galileo trace for serious simulator: {e}")
+        
+        # Flush traces to Galileo
+        try:
+            self.galileo_logger.flush()
+        except Exception as e:
+            print(f"Warning: Could not flush Galileo traces from serious simulator: {e}")
         
         # Return as formatted JSON string for Galileo
         return json.dumps(galileo_output, indent=2)
