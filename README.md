@@ -1,6 +1,8 @@
 # 🚀 Startup Sim 3000
 
-An 8-bit styled AI-powered startup pitch generator that creates either silly, creative pitches or professional business proposals. Built with a custom agentic framework powered by OpenAI and monitored with Galileo observability.
+An 8-bit styled AI-powered startup pitch generator that creates either silly, 
+creative pitches or professional business proposals. Built with a custom 
+agentic framework powered by OpenAI and monitored with Galileo observability.
 
 ![Galileo Powered](static/images/05-25-Galileo-Logo-Primary-Horizontal-Light.png)
 
@@ -8,8 +10,10 @@ An 8-bit styled AI-powered startup pitch generator that creates either silly, cr
 
 ### 🎭 Dual Modes
 
-- **Silly Mode**: Generates absurd, creative startup pitches inspired by HackerNews trends
-- **Serious Mode**: Creates professional, corporate business proposals with market analysis from NewsAPI
+- **Silly Mode**: Generates absurd, creative startup pitches inspired by 
+  HackerNews trends
+- **Serious Mode**: Creates professional, corporate business proposals with 
+  market analysis from NewsAPI
 
 ### 🎮 8-bit Web Interface
 
@@ -35,6 +39,7 @@ An 8-bit styled AI-powered startup pitch generator that creates either silly, cr
 ## 📋 Quick Reference
 
 ### 🚀 Get Started Fast
+
 ```bash
 # 1. Clone and setup
 git clone https://github.com/erinmikailstaples/startup-sim-3000.git
@@ -53,6 +58,7 @@ python run_startup_sim.py  # CLI version
 ```
 
 ### 🎯 Common Commands
+
 ```bash
 # Start web server
 python web_server.py
@@ -68,6 +74,7 @@ which python  # Should show path to venv/bin/python
 ```
 
 ### 🔧 Key Files
+
 - `agent.py` - Main agent implementation
 - `tools/` - Tool implementations
 - `web_server.py` - Flask web server
@@ -78,30 +85,32 @@ which python  # Should show path to venv/bin/python
 
 ### How It Works (For Beginners)
 
-Think of this application like a smart assistant that follows a recipe to cook up startup ideas! Here's the simple flow:
+Think of this application like a smart assistant that follows a recipe to cook 
+up startup ideas! Here's the simple flow:
 
 ```
 1. User Input → 2. Agent Planning → 3. Tool Execution → 4. Result Generation
 ```
 
-**Step 1: User Input**
+#### Step 1: User Input
 
-- You provide: Industry (e.g., "fintech"), Audience (e.g., "millennials"), Random Word (e.g., "blockchain")
+- You provide: Industry (e.g., "fintech"), Audience (e.g., "millennials"), 
+  Random Word (e.g., "blockchain")
 - The system decides which mode to use (Silly vs Serious)
 
-**Step 2: Agent Planning**
+#### Step 2: Agent Planning
 
 - The AI agent analyzes your request
 - It creates a step-by-step plan using available tools
 - Think of this like a chef reading a recipe before cooking
 
-**Step 3: Tool Execution**
+#### Step 3: Tool Execution
 
 - **Silly Mode**: Fetches HackerNews trends → Generates creative pitch
 - **Serious Mode**: Fetches business news → Generates professional plan
 - Each tool is like a specialized kitchen appliance
 
-**Step 4: Result Generation**
+#### Step 4: Result Generation
 
 - The agent combines all the results
 - Formats the final startup pitch
@@ -129,16 +138,19 @@ graph TD
 ### Core Components Explained
 
 **🎮 Web Interface (`templates/`, `static/`)**
+
 - The beautiful 8-bit game-like interface you interact with
 - Handles user input and displays results
 - Built with HTML, CSS, and JavaScript
 
 **🤖 Agent Framework (`agent_framework/`)**
+
 - The "brain" of the system
 - Manages tool selection and execution
 - Handles communication between different parts
 
 **🔧 Tools (`tools/`)**
+
 - Specialized functions that do specific tasks:
   - `hackernews_tool.py`: Gets trending tech news
   - `news_api_tool.py`: Gets business market data
@@ -146,12 +158,14 @@ graph TD
   - `serious_startup_simulator.py`: Creates professional business plans
 
 **🌐 API Integration**
+
 - `OpenAI`: Provides the AI language model (GPT-4)
 - `NewsAPI`: Provides real-time business news
 - `HackerNews`: Provides tech community trends
 - `Galileo`: Monitors and logs everything (optional)
 
 **📊 Observability**
+
 - Every action is logged and tracked
 - Helps debug issues and understand how the system works
 - Provides insights into performance and usage
@@ -168,12 +182,14 @@ graph TD
 ### Step-by-Step Setup Guide
 
 #### Step 1: Clone and Navigate
+
 ```bash
 git clone https://github.com/erinmikailstaples/startup-sim-3000.git
 cd startup-sim-3000
 ```
 
 #### Step 2: Create Virtual Environment
+
 ```bash
 # Create virtual environment
 python -m venv venv
@@ -190,11 +206,13 @@ where python  # Windows
 ```
 
 #### Step 3: Install Dependencies
+
 ```bash
 pip install -r requirements.txt
 ```
 
 #### Step 4: Set Up Environment Variables
+
 ```bash
 # Copy the example environment file
 cp .env.example .env
@@ -207,22 +225,26 @@ nano .env  # or code .env, vim .env, etc.
 #### Step 5: Get Your API Keys
 
 **OpenAI API Key (Required):**
+
 1. Go to [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 2. Sign up/login to OpenAI
 3. Click "Create new secret key"
 4. Copy the key and paste it in your `.env` file
 
 **NewsAPI Key (Required for Serious Mode):**
+
 1. Go to [https://newsapi.org/register](https://newsapi.org/register)
 2. Sign up for a free account
 3. Copy your API key and paste it in your `.env` file
 
 **Galileo API Key (Optional - for observability):**
+
 1. Go to [https://console.galileo.ai/](https://console.galileo.ai/)
 2. Sign up for an account
 3. Create a new project and copy the API key
 
 #### Step 6: Test Your Setup
+
 ```bash
 # Test the CLI version first (simpler)
 python run_startup_sim.py
@@ -234,6 +256,7 @@ python run_startup_sim.py
 ```
 
 #### Step 7: Start the Web Application
+
 ```bash
 python web_server.py
 ```
@@ -243,6 +266,7 @@ Open your browser and go to: `http://localhost:2021`
 ### Expected Outputs
 
 **CLI Mode:**
+
 ```
 Enter an industry: fintech
 Enter a target audience: millennials
@@ -252,6 +276,7 @@ Enter a random word: blockchain
 ```
 
 **Web Mode:**
+
 - Beautiful 8-bit styled interface
 - Mode selection (Silly 🎭 vs Serious 💼)
 - Form inputs with validation
@@ -261,6 +286,7 @@ Enter a random word: blockchain
 ### Troubleshooting Common Issues
 
 **"ModuleNotFoundError" or "No module named 'openai'":**
+
 ```bash
 # Make sure your virtual environment is activated
 source venv/bin/activate  # macOS/Linux
@@ -275,6 +301,7 @@ pip install -r requirements.txt
 ```
 
 **"API key not found" errors:**
+
 ```bash
 # Check if .env file exists and has the right keys
 cat .env
@@ -291,6 +318,7 @@ ls -la .env  # Should show the file in project root
 ```
 
 **"Port already in use" error:**
+
 ```bash
 # The web server runs on port 2021
 # If it's busy, you can change it in web_server.py
@@ -303,6 +331,7 @@ netstat -ano | findstr :2021  # Windows (then kill the PID)
 ```
 
 **Web interface not loading:**
+
 ```bash
 # Check if Flask is running
 python web_server.py
@@ -315,6 +344,7 @@ python web_server.py
 ```
 
 **"Galileo API key not set" warning:**
+
 ```bash
 # This is just a warning - the app will work without Galileo
 # Galileo is optional for observability
@@ -322,6 +352,7 @@ python web_server.py
 ```
 
 **Tools not executing properly:**
+
 ```bash
 # Check tool registration in agent.py
 # Verify API keys in .env file
@@ -335,6 +366,7 @@ python -c "import asyncio; from tools.hackernews_tool import HackerNewsTool; pri
 ```
 
 **"Permission denied" errors:**
+
 ```bash
 # Make sure you have write permissions
 chmod +x web_server.py
@@ -344,6 +376,7 @@ chmod +x run_startup_sim.py
 ```
 
 **Slow performance:**
+
 ```bash
 # Check your internet connection
 # OpenAI API calls can take 5-15 seconds
@@ -352,6 +385,7 @@ chmod +x run_startup_sim.py
 ```
 
 **"Invalid mode" errors:**
+
 ```bash
 # Only "silly" and "serious" modes are supported
 # Check the mode parameter in your request
@@ -378,6 +412,7 @@ LLM_TEMPERATURE=0.7
 ```
 
 #### API Key Sources
+
 - **OpenAI API**: [https://platform.openai.com/api-keys](https://platform.openai.com/api-keys)
 - **NewsAPI**: [https://newsapi.org/register](https://newsapi.org/register)
 - **Galileo**: [https://console.galileo.ai/](https://console.galileo.ai/)
@@ -387,11 +422,13 @@ LLM_TEMPERATURE=0.7
 ### Web Application (Recommended)
 
 1. **Start the web server**
+
    ```bash
    python web_server.py
    ```
 
 2. **Open your browser**
+
    ```
    http://localhost:2021
    ```
@@ -408,6 +445,7 @@ python run_startup_sim.py
 ```
 
 Follow the prompts to enter:
+
 - Industry (e.g., "fintech", "healthcare", "gaming")
 - Target audience (e.g., "millennials", "small businesses", "developers")
 - Random word (e.g., "blockchain", "unicorn", "synergy")
@@ -415,6 +453,7 @@ Follow the prompts to enter:
 ## 🎓 Learning Path
 
 ### 🟢 **Level 1: Just Want to Try It (Beginner)**
+
 **Goal**: Get the app running and generate your first startup pitch
 
 1. **Follow the Quick Start guide above**
@@ -426,9 +465,11 @@ Follow the prompts to enter:
    - Audience: "teenagers", "small businesses", "developers"
    - Random Word: "AI", "blockchain", "sustainability"
 
-**What you'll learn**: How AI can generate creative content and the basics of API integration
+**What you'll learn**: How AI can generate creative content and the basics of 
+API integration
 
 ### 🟡 **Level 2: Understand How It Works (Intermediate)**
+
 **Goal**: Learn about the agentic framework and tool architecture
 
 1. **Read the code structure**:
@@ -437,15 +478,18 @@ Follow the prompts to enter:
    - Examine `web_server.py` (how the web interface connects)
 
 2. **Try the CLI version**:
+
    ```bash
    python run_startup_sim.py
    ```
 
 3. **Add a simple tool** (see "Adding New Tools" section below)
 
-**What you'll learn**: Agentic AI patterns, tool development, and async programming
+**What you'll learn**: Agentic AI patterns, tool development, and async 
+programming
 
 ### 🔴 **Level 3: Customize and Extend (Advanced)**
+
 **Goal**: Build your own features and understand the full architecture
 
 1. **Study the agent framework**:
@@ -463,7 +507,8 @@ Follow the prompts to enter:
    - Analyze the JSON logs
    - Understand the trace structure
 
-**What you'll learn**: Advanced AI system design, observability patterns, and production-ready architectures
+**What you'll learn**: Advanced AI system design, observability patterns, and 
+production-ready architectures
 
 ## 🛠️ Development Guide
 
@@ -636,62 +681,68 @@ class WeatherTool(BaseTool):
 To add a new mode (like "technical" or "creative"):
 
 1. **Update the agent constructor**:
-```python
-# In agent.py
-def __init__(self, mode: str = "silly"):
-    if mode not in ["silly", "serious", "technical"]:
-        raise ValueError(f"Invalid mode: {mode}")
-    self.mode = mode
-```
+
+   ```python
+   # In agent.py
+   def __init__(self, mode: str = "silly"):
+       if mode not in ["silly", "serious", "technical"]:
+           raise ValueError(f"Invalid mode: {mode}")
+       self.mode = mode
+   ```
 
 2. **Add mode-specific logic**:
-```python
-# In the run method
-if self.mode == "technical":
-    task = f"Generate a technical specification for a {industry} startup..."
-elif self.mode == "creative":
-    task = f"Create an innovative concept for a {industry} company..."
-```
+
+   ```python
+   # In the run method
+   if self.mode == "technical":
+       task = f"Generate a technical specification for a {industry} startup..."
+   elif self.mode == "creative":
+       task = f"Create an innovative concept for a {industry} company..."
+   ```
 
 3. **Update the web interface**:
-```javascript
-// In static/js/app.js
-const modeOptions = {
-    silly: { icon: "🎭", title: "SILLY MODE" },
-    serious: { icon: "💼", title: "SERIOUS MODE" },
-    technical: { icon: "⚙️", title: "TECHNICAL MODE" }
-};
-```
+
+   ```javascript
+   // In static/js/app.js
+   const modeOptions = {
+       silly: { icon: "🎭", title: "SILLY MODE" },
+       serious: { icon: "💼", title: "SERIOUS MODE" },
+       technical: { icon: "⚙️", title: "TECHNICAL MODE" }
+   };
+   ```
 
 ### Customizing the Web Interface
 
 #### Adding New UI Elements
 
 1. **Update HTML template** (`templates/index.html`):
-```html
-<!-- Add new mode option -->
-<div class="mode-option" id="technical-mode">
-    <div class="mode-icon">⚙️</div>
-    <div class="mode-title">TECHNICAL MODE</div>
-    <div class="mode-desc">Generate technical specifications</div>
-</div>
-```
+
+   ```html
+   <!-- Add new mode option -->
+   <div class="mode-option" id="technical-mode">
+       <div class="mode-icon">⚙️</div>
+       <div class="mode-title">TECHNICAL MODE</div>
+       <div class="mode-desc">Generate technical specifications</div>
+   </div>
+   ```
 
 2. **Update JavaScript** (`static/js/app.js`):
-```javascript
-// Add event listener
-document.getElementById('technical-mode').addEventListener('click', () => {
-    this.selectMode('technical');
-});
-```
+
+   ```javascript
+   // Add event listener
+   document.getElementById('technical-mode').addEventListener('click', () => {
+       this.selectMode('technical');
+   });
+   ```
 
 3. **Update CSS** (`static/css/style.css`):
-```css
-/* Add styling for new elements */
-.technical-mode {
-    background: linear-gradient(45deg, #2c3e50, #34495e);
-}
-```
+
+   ```css
+   /* Add styling for new elements */
+   .technical-mode {
+       background: linear-gradient(45deg, #2c3e50, #34495e);
+   }
+   ```
 
 ### Working with Observability
 
@@ -720,6 +771,7 @@ logger.conclude(output="my output")
 #### Adding Custom Metrics
 
 ```python
+# Track custom metrics
 import time
 
 async def my_tool():
@@ -775,17 +827,20 @@ async def test_my_custom_tool():
 ## 🎯 Key Concepts to Master
 
 **Agentic AI**: Systems that can plan and execute multi-step tasks
+
 - **Planning**: Breaking down complex tasks into steps
 - **Tool Selection**: Choosing the right tools for each step
 - **Execution**: Running tools and handling results
 - **State Management**: Keeping track of context and progress
 
 **Tool Architecture**: Modular, reusable functions
+
 - **Input/Output Schemas**: Defining what tools expect and return
 - **Error Handling**: Graceful failure and recovery
 - **Async Patterns**: Non-blocking operations for better performance
 
 **Observability**: Understanding what your system is doing
+
 - **Logging**: Recording events and data
 - **Tracing**: Following requests through the system
 - **Metrics**: Measuring performance and usage
@@ -873,6 +928,7 @@ The 8-bit aesthetic uses CSS custom properties for easy theming:
 ### Mode Configuration
 
 Add new modes by:
+
 1. Creating new tool implementations
 2. Updating `selectMode()` in `app.js`
 3. Adding mode-specific logic in `agent.py`
@@ -886,6 +942,7 @@ Add new modes by:
 Generate a startup pitch based on input parameters.
 
 **Request Body:**
+
 ```json
 {
   "industry": "fintech",
@@ -896,6 +953,7 @@ Generate a startup pitch based on input parameters.
 ```
 
 **Response:**
+
 ```json
 {
   "result": "Our synergistic blockchain platform leverages scalable infrastructure to deliver sustainable competitive advantages in the fintech ecosystem..."
@@ -930,6 +988,7 @@ Generate a startup pitch based on input parameters.
 ### Common Issues
 
 **"ModuleNotFoundError" errors**
+
 ```bash
 # Ensure virtual environment is activated
 source venv/bin/activate
@@ -937,6 +996,7 @@ pip install -r requirements.txt
 ```
 
 **"API key not found" errors**
+
 ```bash
 # Check .env file exists and contains required keys
 cat .env
@@ -953,6 +1013,7 @@ ls -la .env  # Should show the file in project root
 ```
 
 **Web interface not loading**
+
 ```bash
 # Check Flask is running on correct port
 python web_server.py
@@ -960,6 +1021,7 @@ python web_server.py
 ```
 
 **Tools not executing properly**
+
 ```bash
 # Check tool registration in agent.py
 # Verify API keys in .env file
@@ -968,7 +1030,8 @@ python web_server.py
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file 
+for details.
 
 ## 🙏 Acknowledgments
 
