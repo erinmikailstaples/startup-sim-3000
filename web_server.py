@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 
 import asyncio
+import json
 from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 from agent import SimpleAgent
 from agent_framework.llm.openai_provider import OpenAIProvider
 from agent_framework.llm.models import LLMConfig
-from galileo import galileo_context
+
 import os
 from dotenv import load_dotenv
 
@@ -31,13 +32,49 @@ def generate_startup():
         random_word = data.get('randomWord', '').strip()
         mode = data.get('mode', 'silly').strip()  # Default to silly mode
         
+        # Log API request as JSON
+        api_request = {
+            "endpoint": "/api/generate",
+            "method": "POST",
+            "inputs": {
+                "industry": industry,
+                "audience": audience,
+                "random_word": random_word,
+                "mode": mode
+            }
+        }
+        print(f"API Request: {json.dumps(api_request, indent=2)}")
+        
         if not industry or not audience or not random_word:
             return jsonify({'error': 'All fields are required'}), 400
         
-        # Run the agent asynchronously
-        result = asyncio.run(run_agent(industry, audience, random_word, mode))
+        # Run the agent asynchronously with proper event loop handling
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            agent_result = loop.run_until_complete(run_agent(industry, audience, random_word, mode))
+        finally:
+            loop.close()
         
-        return jsonify({'result': result})
+        # Parse the structured JSON result from agent
+        try:
+            parsed_result = json.loads(agent_result)
+            final_output = parsed_result.get("final_output", "No output generated")
+        except json.JSONDecodeError:
+            # Fallback if result is not JSON
+            final_output = str(agent_result)
+        
+        # Log API response as JSON
+        api_response = {
+            "endpoint": "/api/generate",
+            "status": "success",
+            "result_length": len(final_output),
+            "mode": mode,
+            "agent_result_preview": str(agent_result)[:200] + "..." if len(str(agent_result)) > 200 else str(agent_result)
+        }
+        print(f"API Response: {json.dumps(api_response, indent=2)}")
+        
+        return jsonify({'result': final_output})
         
     except Exception as e:
         print(f"Error generating startup: {e}")
@@ -67,11 +104,9 @@ async def run_agent(industry: str, audience: str, random_word: str, mode: str = 
             f"incorporate relevant trends from the HackerNews stories."
         )
     
-    # Run the agent within Galileo context with mode-specific metadata
-    context_name = f"startup_generator_{mode}_mode"
-    with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
-        result = await agent.run(task)
-        return result
+    # Run the agent with individual parameters (Galileo logging handled internally by agent and tools)
+    result = await agent.run(task, industry=industry, audience=audience, random_word=random_word)
+    return result
 
 if __name__ == '__main__':
     # Ensure Galileo environment variables are set
