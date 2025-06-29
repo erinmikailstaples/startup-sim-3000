@@ -26,7 +26,20 @@ from tools.news_api_tool import NewsAPITool
 load_dotenv()
 
 class SimpleAgent(Agent):
-    """A simple agent that demonstrates basic functionality"""
+    """
+    A simple agent that demonstrates basic agentic AI functionality.
+    
+    This agent showcases the core concepts of agentic AI:
+    1. Tool Registration: Making different capabilities available to the agent
+    2. Task Planning: Breaking down complex requests into executable steps
+    3. Tool Selection: Choosing the right tools for each step
+    4. Execution: Running tools and handling their results
+    5. Result Formatting: Combining outputs into a coherent response
+    
+    The agent operates in two modes:
+    - Silly Mode: Uses HackerNews for inspiration and generates creative pitches
+    - Serious Mode: Uses NewsAPI for market data and generates professional plans
+    """
     
     def __init__(
         self,
@@ -37,6 +50,7 @@ class SimpleAgent(Agent):
         llm_provider: Optional[OpenAIProvider] = None,
         mode: str = "silly",
     ):
+        # Initialize the base Agent class with configuration
         super().__init__(
             verbosity=verbosity,
             logger=logger,
@@ -44,15 +58,22 @@ class SimpleAgent(Agent):
             metadata=metadata,
             llm_provider=llm_provider
         )
+        
+        # Agent state management - keeps track of context and results
         self.state = AgentState()
+        
+        # Mode determines which tools and prompts to use
+        # "silly" = creative/fun pitches, "serious" = professional business plans
         self.mode = mode
         
-        # Initialize Galileo Logger
+        # Initialize Galileo Logger for observability
+        # This helps us track what the agent is doing and debug issues
         project_id = os.getenv("GALILEO_PROJECT_ID", "erin-custom-metric")
         log_stream = os.getenv("GALILEO_LOG_STREAM", "my_log_stream")
         self.galileo_logger = GalileoLogger(project=project_id, log_stream=log_stream)
         
-        # Set up template environment
+        # Set up Jinja2 template environment for dynamic prompt generation
+        # Templates allow us to create flexible prompts based on user input
         template_dir = Path(__file__).parent / "templates"
         self.template_env = Environment(
             loader=FileSystemLoader(template_dir),
@@ -61,57 +82,88 @@ class SimpleAgent(Agent):
         )
         
         # Configure LLM provider if not provided
+        # The LLM (Language Model) is the "brain" that makes decisions
         if not self.llm_provider:
             llm_config = LLMConfig(
-                model="gpt-4",
-                temperature=0.7
+                model="gpt-4",  # Using GPT-4 for high-quality reasoning
+                temperature=0.7  # Balanced creativity vs consistency
             )
             self.llm_provider = OpenAIProvider(config=llm_config)
         
-        # Register tools
+        # Register all available tools with the agent
+        # Tools are like "apps" that the agent can use to accomplish tasks
         self._register_tools()
 
     def _register_tools(self) -> None:
-        """Register all tools with the registry"""
-        # Text analyzer
+        """
+        Register all available tools with the agent's tool registry.
+        
+        Think of tools as specialized functions that the agent can call.
+        Each tool has:
+        - A name and description
+        - Input/output schemas (what it expects and returns)
+        - Tags for categorization
+        - An implementation (the actual code that runs)
+        
+        The agent will automatically choose which tools to use based on the task.
+        """
+        
+        # Text analysis tool - can analyze and process text content
         self.tool_registry.register(
             metadata=TextAnalyzerTool.get_metadata(),
             implementation=TextAnalyzerTool
         )
         
-        # Keyword extractor
+        # Keyword extraction tool - finds important words/phrases in text
         self.tool_registry.register(
             metadata=KeywordExtractorTool.get_metadata(),
             implementation=KeywordExtractorTool
         )
         
-        # Startup simulator
+        # Startup simulator tool - generates silly, creative startup pitches
+        # Used in "silly" mode
         self.tool_registry.register(
             metadata=StartupSimulatorTool.get_metadata(),
             implementation=StartupSimulatorTool
         )
         
-        # Serious startup simulator
+        # Serious startup simulator tool - generates professional business plans
+        # Used in "serious" mode
         self.tool_registry.register(
             metadata=SeriousStartupSimulatorTool.get_metadata(),
             implementation=SeriousStartupSimulatorTool
         )
         
-        # HackerNews tool
+        # HackerNews tool - fetches trending tech stories for inspiration
+        # Used in "silly" mode to get creative context
         self.tool_registry.register(
             metadata=HackerNewsTool.get_metadata(),
             implementation=HackerNewsTool
         )
         
-        # NewsAPI tool
+        # NewsAPI tool - fetches business news for market analysis
+        # Used in "serious" mode to get professional context
         self.tool_registry.register(
             metadata=NewsAPITool.get_metadata(),
             implementation=NewsAPITool
         )
 
     async def _format_result(self, task: str, results: List[tuple[str, Any]]) -> str:
-        """Format the final result from tool executions"""
-        # Check for silly mode first
+        """
+        Format the final result from tool executions.
+        
+        This method takes the raw outputs from all the tools and formats them
+        into a coherent, user-friendly response. It's like the final step in
+        a recipe where you plate the dish nicely.
+        
+        Args:
+            task: The original user request
+            results: List of (tool_name, result) tuples from executed tools
+            
+        Returns:
+            Formatted string response for the user
+        """
+        # Check for silly mode first - look for startup_simulator tool results
         for tool_name, result in results:
             if tool_name == "startup_simulator":
                 # Parse the JSON string result from Galileo-formatted output
@@ -123,7 +175,7 @@ class SimpleAgent(Agent):
                         # Fallback for dict format (shouldn't happen now)
                         pitch = result.get("pitch", "")
                     
-                    # Log full structured result to Galileo
+                    # Log full structured result to Galileo for observability
                     result_data = {
                         "tool": tool_name,
                         "mode": "silly",
@@ -136,7 +188,7 @@ class SimpleAgent(Agent):
                     print(f"Error parsing silly mode result: {e}")
                     return str(result)
         
-        # Check for serious mode
+        # Check for serious mode - look for serious_startup_simulator tool results
         for tool_name, result in results:
             if tool_name == "serious_startup_simulator":
                 # Parse the JSON string result from Galileo-formatted output
@@ -148,7 +200,7 @@ class SimpleAgent(Agent):
                         # Fallback for dict format (shouldn't happen now)
                         pitch = result.get("pitch", "")
                     
-                    # Log full structured result to Galileo
+                    # Log full structured result to Galileo for observability
                     result_data = {
                         "tool": tool_name,
                         "mode": "serious",
@@ -164,9 +216,30 @@ class SimpleAgent(Agent):
         return "No startup pitch generated."
 
     async def run(self, task: str, industry: str = "", audience: str = "", random_word: str = "") -> str:
-        """Execute the agent's task with Galileo monitoring"""
+        """
+        Execute the agent's task with Galileo monitoring.
+        
+        This is the main entry point for the agent. It orchestrates the entire process:
+        1. Stores user parameters for tool execution
+        2. Starts Galileo tracing for observability
+        3. Calls the parent Agent.run() method which handles:
+           - Task planning (breaking down the request)
+           - Tool selection (choosing which tools to use)
+           - Tool execution (running the selected tools)
+           - Result formatting (combining outputs)
+        
+        Args:
+            task: The user's request (e.g., "generate a startup pitch")
+            industry: Target industry for the startup
+            audience: Target audience for the startup
+            random_word: Random word to include in the pitch
+            
+        Returns:
+            Formatted startup pitch as a string
+        """
         
         # Store parameters for tool execution
+        # These will be passed to individual tools as needed
         self.task_parameters = {
             "industry": industry,
             "audience": audience, 
@@ -174,6 +247,7 @@ class SimpleAgent(Agent):
         }
         
         # Start Galileo trace with structured input
+        # This creates a "breadcrumb trail" to track what the agent does
         trace_input = {
             "user_task": task,
             "agent_mode": self.mode,
@@ -181,7 +255,8 @@ class SimpleAgent(Agent):
             "timestamp": datetime.now().isoformat()
         }
         
-        # Log workflow start as JSON
+        # Log workflow start as JSON for observability
+        # This helps us understand the agent's decision-making process
         workflow_data = {
             "agent_id": self.agent_id,
             "mode": self.mode,
