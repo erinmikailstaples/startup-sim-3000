@@ -4,7 +4,9 @@ An 8-bit styled AI-powered startup pitch generator that creates either silly,
 creative pitches or professional business proposals. Built with a custom 
 agentic framework powered by OpenAI and monitored with Galileo observability.
 
-![Galileo Powered](static/images/05-25-Galileo-Logo-Primary-Horizontal-Light.png)
+This project was built for the **[Databricks Data + AI Summit 2025](https://www.databricks.com/dataaisummit/session/generating-laughter-testing-and-evaluating-success-llms-comedy)** + presented by Erin Mikail Staples.  Watch the presentation [here](https://www.youtube.com/watch?v=zn5WvgZcdMA) or grab the slides [here](https://docs.google.com/presentation/d/1Mg99Bbjz5SCyzLdqfsw8kqw_d-RGU8cf-Xf4eUE2tXk/edit?usp=sharing).
+
+![Powered by Galileo](static/images/05-25-Galileo-Logo-Primary-Horizontal-Light.png)
 
 ## ✨ Features
 
@@ -35,8 +37,17 @@ agentic framework powered by OpenAI and monitored with Galileo observability.
 - Structured JSON output for debugging and analysis
 - LLM call tracking with token usage and performance metrics
 - Distributed tracing across the entire execution pipeline
+- Custom metrics evaluating the performance of the agent and tools
 
 ## 📋 Quick Reference
+
+### ℹ️ Requirements
+
+- Python 3.8+
+- OpenAI API Key [Get one here](https://platform.openai.com/api-keys)
+- NewsAPI Key (for serious mode) [Get one here](https://newsapi.org/register)
+- A free account on [Galileo](https://app.galileo.ai/)
+- A free account on [NewsAPI](https://newsapi.org/register)
 
 ### 🚀 Get Started Fast
 
