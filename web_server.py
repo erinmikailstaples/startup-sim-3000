@@ -7,6 +7,7 @@ from flask_cors import CORS
 from agent import SimpleAgent
 from agent_framework.llm.openai_provider import OpenAIProvider
 from agent_framework.llm.models import LLMConfig
+from galileo import galileo_context
 
 import os
 from dotenv import load_dotenv
@@ -48,13 +49,15 @@ def generate_startup():
         if not industry or not audience or not random_word:
             return jsonify({'error': 'All fields are required'}), 400
         
-        # Run the agent asynchronously with proper event loop handling
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            agent_result = loop.run_until_complete(run_agent(industry, audience, random_word, mode))
-        finally:
-            loop.close()
+        # Run the agent within Galileo context for proper trace management
+        with galileo_context():
+            # Run the agent asynchronously with proper event loop handling
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                agent_result = loop.run_until_complete(run_agent(industry, audience, random_word, mode))
+            finally:
+                loop.close()
         
         # Parse the structured JSON result from agent
         try:
@@ -104,17 +107,13 @@ async def run_agent(industry: str, audience: str, random_word: str, mode: str = 
             f"incorporate relevant trends from the HackerNews stories."
         )
     
-    # Run the agent with individual parameters (Galileo logging handled internally by agent and tools)
+    # Run the agent with individual parameters (Galileo logging handled by context manager)
     result = await agent.run(task, industry=industry, audience=audience, random_word=random_word)
     return result
 
 if __name__ == '__main__':
-    # Ensure Galileo environment variables are set
-    if not os.getenv("GALILEO_API_KEY"):
-        print("Warning: GALILEO_API_KEY not set. Galileo logging will be disabled.")
-    
+    # All Galileo logging is handled by the context manager and agent/tools.
     if not os.getenv("OPENAI_API_KEY"):
         print("Error: OPENAI_API_KEY not set. Please set this environment variable.")
         exit(1)
-    
     app.run(debug=True, host='0.0.0.0', port=2021)

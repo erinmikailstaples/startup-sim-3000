@@ -5,9 +5,10 @@ from galileo import GalileoLogger
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
+from agent_framework.llm.models import LLMMessage
 import asyncio
 from dotenv import load_dotenv
-from agent_framework.utils.logging import GalileoLoggerWrapper
+from agent_framework.utils.logging import get_galileo_logger
 
 # Load environment variables
 load_dotenv()
@@ -17,10 +18,8 @@ class SeriousStartupSimulatorTool(BaseTool):
     
     def __init__(self):
         super().__init__()
-        # Initialize Galileo Logger
-        project_id = os.getenv("GALILEO_PROJECT_ID", "erin-custom-metric")
-        log_stream = os.getenv("GALILEO_LOG_STREAM", "my_log_stream")
-        self.galileo_logger = GalileoLoggerWrapper(project=project_id, log_stream=log_stream)
+        # Initialize Galileo Logger using centralized instance
+        self.galileo_logger = get_galileo_logger()
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
@@ -57,22 +56,8 @@ class SeriousStartupSimulatorTool(BaseTool):
         }
         print(f"Serious Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Start Galileo trace for this tool with string metadata
-        try:
-            trace = self.galileo_logger.start_trace(
-                input=json.dumps(inputs, indent=2),
-                name="Serious Startup Pitch Generation",
-                metadata={
-                    "tool": "serious_startup_simulator",
-                    "mode": "serious",
-                    "has_news_context": str(bool(news_context))
-                },
-                tags=["startup-generator", "serious-mode", "business-pitch"]
-            )
-            print(f"Galileo trace started successfully for serious startup simulator")
-        except Exception as e:
-            print(f"Warning: Could not start Galileo trace for serious simulator: {e}")
-            trace = None
+        # Galileo trace management is handled by the context manager
+        # No need for manual trace creation, conclusion, or flushing here
         
         news_context_prompt = ""
         if news_context:
@@ -114,18 +99,6 @@ class SeriousStartupSimulatorTool(BaseTool):
         
         content = response.choices[0].message.content.strip()
         
-        # Add LLM span to Galileo trace (only if trace was created successfully)
-        if trace is not None:
-            try:
-                self.galileo_logger.add_llm_span(
-                    input=prompt,
-                    output=content,
-                    model="gpt-4",
-                    name="Serious Pitch Generation"
-                )
-            except Exception as e:
-                print(f"Warning: Could not add LLM span for serious simulator: {e}")
-        
         # Ensure it's under 500 characters
         if len(content) > 500:
             content = content[:497] + "..."
@@ -164,21 +137,6 @@ class SeriousStartupSimulatorTool(BaseTool):
             "metadata": output
         }
         
-        # Conclude Galileo trace with final output (only if trace was created successfully)
-        if trace is not None:
-            try:
-                self.galileo_logger.conclude(output=json.dumps(galileo_output, indent=2))
-                print(f"Galileo trace concluded successfully for serious startup simulator")
-            except Exception as e:
-                print(f"Warning: Could not conclude Galileo trace for serious simulator: {e}")
-        
-        # Flush traces to Galileo
-        try:
-            self.galileo_logger.flush()
-        except Exception as e:
-            print(f"Warning: Could not flush Galileo traces from serious simulator: {e}")
-        
-        # Return as formatted JSON string for Galileo
         return json.dumps(galileo_output, indent=2)
     
     def _parse_business_pitch(self, content: str) -> Dict[str, str]:

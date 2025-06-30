@@ -28,8 +28,8 @@ async def main():
     print("3. Analyze text")
     choice = input("\nEnter your choice (1-3): ")
 
-    # Run the agent within Galileo context
-    with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
+    # Run the agent within Galileo context for proper trace management
+    with galileo_context():
         if choice == "1":
             industry = input("Enter an industry: ")
             audience = input("Enter a target audience: ")

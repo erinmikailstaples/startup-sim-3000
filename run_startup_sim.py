@@ -2,14 +2,13 @@ import asyncio
 from agent import SimpleAgent
 from agent_framework.llm.openai_provider import OpenAIProvider
 from agent_framework.llm.models import LLMConfig
-from galileo import galileo_context, log
+from galileo import galileo_context
 import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
 
-@log(span_type="workflow", name="startup_simulator_main")
 async def main():
     # Ensure Galileo environment variables are set
     if not os.getenv("GALILEO_API_KEY"):
@@ -34,8 +33,8 @@ async def main():
         f"incorporate relevant trends from the HackerNews stories."
     )
 
-    # Run the agent within Galileo context
-    with galileo_context(project="erin-custom-metric", log_stream="my_log_stream"):
+    # Run the agent within Galileo context for proper trace management
+    with galileo_context():
         result = await agent.run(task)
         print(result)
 

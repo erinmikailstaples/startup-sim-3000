@@ -8,7 +8,7 @@ from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
 import asyncio
 from dotenv import load_dotenv
-from agent_framework.utils.logging import GalileoLoggerWrapper
+from agent_framework.utils.logging import get_galileo_logger
 
 # Load environment variables
 load_dotenv()
@@ -18,10 +18,8 @@ class StartupSimulatorTool(BaseTool):
     
     def __init__(self):
         super().__init__()
-        # Initialize Galileo Logger
-        project_id = os.getenv("GALILEO_PROJECT_ID", "erin-custom-metric")
-        log_stream = os.getenv("GALILEO_LOG_STREAM", "my_log_stream")
-        self.galileo_logger = GalileoLoggerWrapper(project=project_id, log_stream=log_stream)
+        # Initialize Galileo Logger using centralized instance
+        self.galileo_logger = get_galileo_logger()
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
@@ -58,22 +56,8 @@ class StartupSimulatorTool(BaseTool):
         }
         print(f"Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Start Galileo trace for this tool with string metadata
-        try:
-            trace = self.galileo_logger.start_trace(
-                input=json.dumps(inputs, indent=2),
-                name="Silly Startup Pitch Generation",
-                metadata={
-                    "tool": "startup_simulator",
-                    "mode": "silly",
-                    "has_hn_context": str(bool(hn_context))
-                },
-                tags=["startup-generator", "silly-mode", "creative-pitch"]
-            )
-            print(f"Galileo trace started successfully for silly startup simulator")
-        except Exception as e:
-            print(f"Warning: Could not start Galileo trace for silly simulator: {e}")
-            trace = None
+        # Galileo trace management is handled by the context manager
+        # No need for manual trace creation, conclusion, or flushing here
         
         hn_context_prompt = ""
         if hn_context:
@@ -99,18 +83,6 @@ class StartupSimulatorTool(BaseTool):
         )
         
         pitch = response.choices[0].message.content.strip()[:500]
-        
-        # Add LLM span to Galileo trace (only if trace was created successfully)
-        if trace is not None:
-            try:
-                self.galileo_logger.add_llm_span(
-                    input=prompt,
-                    output=pitch,
-                    model="gpt-4",
-                    name="Silly Pitch Generation"
-                )
-            except Exception as e:
-                print(f"Warning: Could not add LLM span for silly simulator: {e}")
         
         # Prepare output as JSON
         output = {
@@ -142,20 +114,6 @@ class StartupSimulatorTool(BaseTool):
             "pitch": output["pitch"],
             "metadata": output
         }
-        
-        # Conclude Galileo trace with final output (only if trace was created successfully)
-        if trace is not None:
-            try:
-                self.galileo_logger.conclude(output=json.dumps(galileo_output, indent=2))
-                print(f"Galileo trace concluded successfully for silly startup simulator")
-            except Exception as e:
-                print(f"Warning: Could not conclude Galileo trace for silly simulator: {e}")
-        
-        # Flush traces to Galileo
-        try:
-            self.galileo_logger.flush()
-        except Exception as e:
-            print(f"Warning: Could not flush Galileo traces from silly simulator: {e}")
         
         # Return as formatted JSON string for Galileo
         return json.dumps(galileo_output, indent=2) 
