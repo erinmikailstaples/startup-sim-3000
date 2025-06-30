@@ -3,6 +3,7 @@ venv
 .venv
 .env
 env
+tutorial.md
 
 # Python
 __pycache__/

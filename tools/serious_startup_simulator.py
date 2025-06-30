@@ -7,6 +7,7 @@ from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 import asyncio
 from dotenv import load_dotenv
+from agent_framework.utils.logging import GalileoLoggerWrapper
 
 # Load environment variables
 load_dotenv()
@@ -19,7 +20,7 @@ class SeriousStartupSimulatorTool(BaseTool):
         # Initialize Galileo Logger
         project_id = os.getenv("GALILEO_PROJECT_ID", "erin-custom-metric")
         log_stream = os.getenv("GALILEO_LOG_STREAM", "my_log_stream")
-        self.galileo_logger = GalileoLogger(project=project_id, log_stream=log_stream)
+        self.galileo_logger = GalileoLoggerWrapper(project=project_id, log_stream=log_stream)
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:

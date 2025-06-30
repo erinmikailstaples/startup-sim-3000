@@ -14,7 +14,7 @@ from agent_framework.state import AgentState
 from agent_framework.models import VerbosityLevel, ToolSelectionHooks, TaskExecution
 from agent_framework.llm.models import LLMConfig
 from agent_framework.llm.openai_provider import OpenAIProvider
-from agent_framework.utils.logging import AgentLogger
+from agent_framework.utils.logging import AgentLogger, GalileoLoggerWrapper
 from tools.text_analysis import TextAnalyzerTool
 from tools.keyword_extraction import KeywordExtractorTool
 from tools.startup_simulator import StartupSimulatorTool
@@ -70,7 +70,7 @@ class SimpleAgent(Agent):
         # This helps us track what the agent is doing and debug issues
         project_id = os.getenv("GALILEO_PROJECT_ID", "erin-custom-metric")
         log_stream = os.getenv("GALILEO_LOG_STREAM", "my_log_stream")
-        self.galileo_logger = GalileoLogger(project=project_id, log_stream=log_stream)
+        self.galileo_logger = GalileoLoggerWrapper(project=project_id, log_stream=log_stream)
         
         # Set up Jinja2 template environment for dynamic prompt generation
         # Templates allow us to create flexible prompts based on user input
