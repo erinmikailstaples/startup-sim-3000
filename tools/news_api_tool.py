@@ -1,254 +1,225 @@
 import os
 import json
 import aiohttp
-import asyncio
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass
-from agent_framework.models import ToolMetadata
+from galileo import log
+from typing import Dict, Any, List
 from agent_framework.tools.base import BaseTool
+from agent_framework.models import ToolMetadata
+from agent_framework.utils.logging import get_galileo_logger
 from dotenv import load_dotenv
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
 
-@dataclass
-class NewsArticle:
-    """Data class to represent a news article"""
-    title: str
-    description: Optional[str]
-    url: str
-    source: str
-    author: Optional[str]
-    published_at: str
-
 class NewsAPITool(BaseTool):
-    """Tool for fetching recent news articles using NewsAPI"""
-    
-    BASE_URL = "https://newsapi.org/v2"
-    
-    @classmethod
-    def get_metadata(cls) -> ToolMetadata:
-        """Get metadata for the tool registration"""
-        return ToolMetadata(
-            name="news_api_tool",
-            description="Fetch recent news articles to check for similar startups and market trends",
-            tags=["news", "api", "market-research", "startups"],
-            input_schema={
-                "type": "object",
-                "properties": {
-                    "query": {
-                        "type": "string",
-                        "description": "Search query for news articles (optional)"
-                    },
-                    "category": {
-                        "type": "string",
-                        "description": "News category (business, technology, etc.)"
-                    },
-                    "country": {
-                        "type": "string", 
-                        "description": "Country code (default: us)"
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "description": "Number of articles to fetch (default: 5)"
-                    }
-                }
-            },
-            output_schema={
-                "type": "object",
-                "properties": {
-                    "articles": {
-                        "type": "array",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "title": {"type": "string"},
-                                "description": {"type": "string"},
-                                "url": {"type": "string"},
-                                "source": {"type": "string"},
-                                "author": {"type": "string"},
-                                "published_at": {"type": "string"}
-                            }
-                        }
-                    },
-                    "total_results": {"type": "integer"}
-                }
-            }
-        )
+    """Tool for fetching business news from NewsAPI"""
     
     def __init__(self):
         super().__init__()
         self.name = "news_api_tool"
-        self.description = "Fetch recent news articles to check for similar startups and market trends"
-        self._session = None
-        self.api_key = os.getenv("NEWS_API_KEY")
-        if not self.api_key:
-            raise ValueError("NEWS_API_KEY not found in environment variables")
-    
-    async def __aenter__(self):
-        """Async context manager entry"""
-        return self
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit"""
-        if self._session and not self._session.closed:
-            await self._session.close()
-    
-    @property
-    async def session(self) -> aiohttp.ClientSession:
-        """Get or create an aiohttp session"""
-        if self._session is None or self._session.closed:
-            self._session = aiohttp.ClientSession()
-        return self._session
-    
-    async def get_top_headlines(self, 
-                               country: str = "us", 
-                               category: Optional[str] = None,
-                               limit: int = 5) -> List[NewsArticle]:
-        """Fetch top headlines"""
+        self.description = "Fetch business news articles for market analysis and professional context"
+        self.api_key = os.environ.get("NEWS_API_KEY")
+        # Get the centralized Galileo logger
+        self.galileo_logger = get_galileo_logger()
+
+    @classmethod
+    def get_metadata(cls) -> ToolMetadata:
+        return ToolMetadata(
+            name="news_api_tool",
+            description="Fetches business news articles for market analysis and professional context",
+            tags=["news", "business", "market", "analysis"],
+            input_schema={
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "News category to fetch",
+                        "default": "business"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Number of articles to fetch",
+                        "default": 5
+                    }
+                },
+                "required": []
+            },
+            output_schema={
+                "type": "string",
+                "description": "JSON string containing news articles with metadata"
+            }
+        )
+
+    @log(span_type="tool", name="news_api_tool")
+    async def execute(self, category: str = "business", limit: int = 5) -> str:
+        """Fetch business news articles"""
+        
+        # Log inputs
+        inputs = {
+            "category": category,
+            "limit": limit,
+            "timestamp": datetime.now().isoformat()
+        }
+        print(f"News API Tool Inputs: {json.dumps(inputs, indent=2)}")
+        
+        # Use the centralized Galileo logger
+        logger = self.galileo_logger
+        if not logger:
+            print("⚠️  Warning: Galileo logger not available, proceeding without logging")
+            return await self._execute_without_galileo(category, limit)
+        
+        # Start individual trace for this tool
+        trace = logger.start_trace(f"News API Tool - Fetching {limit} {category} articles")
+        
         try:
-            session = await self.session
+            # Add span for tool execution start
+            logger.add_llm_span(
+                input=f"Fetching {limit} {category} news articles",
+                output="Tool execution started",
+                model="news_api",
+                num_input_tokens=len(str(inputs)),
+                num_output_tokens=0,
+                total_tokens=len(str(inputs)),
+                duration_ns=0
+            )
             
+            if not self.api_key:
+                raise Exception("NEWS_API_KEY not found in environment variables")
+            
+            # Fetch news articles
+            url = f"https://newsapi.org/v2/top-headlines"
             params = {
-                "country": country,
+                "country": "us",
+                "category": category,
                 "apiKey": self.api_key,
                 "pageSize": limit
             }
             
-            if category:
-                params["category"] = category
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params) as response:
+                    if response.status != 200:
+                        raise Exception(f"Failed to fetch news: {response.status}")
+                    
+                    data = await response.json()
+                    articles = data.get("articles", [])
             
-            async with session.get(f"{self.BASE_URL}/top-headlines", params=params) as response:
-                response.raise_for_status()
-                data = await response.json()
-                
-                if data.get("status") != "ok":
-                    raise Exception(f"NewsAPI error: {data.get('message', 'Unknown error')}")
-                
-                articles = []
-                for article_data in data.get("articles", []):
-                    if article_data.get("title") and article_data.get("title") != "[Removed]":
-                        articles.append(NewsArticle(
-                            title=article_data.get("title", ""),
-                            description=article_data.get("description"),
-                            url=article_data.get("url", ""),
-                            source=article_data.get("source", {}).get("name", "Unknown"),
-                            author=article_data.get("author"),
-                            published_at=article_data.get("publishedAt", "")
-                        ))
-                
-                return articles
-                
-        except Exception as e:
-            print(f"Error fetching top headlines: {str(e)}")
-            return []
-    
-    async def search_articles(self, 
-                             query: str, 
-                             limit: int = 5) -> List[NewsArticle]:
-        """Search for articles by query"""
-        try:
-            session = await self.session
+            # Format articles for context
+            formatted_articles = []
+            for article in articles:
+                title = article.get("title", "No title")
+                description = article.get("description", "No description")
+                formatted_articles.append(f"• {title}: {description}")
             
-            params = {
-                "q": query,
-                "apiKey": self.api_key,
-                "pageSize": limit,
-                "sortBy": "relevancy",
-                "language": "en"
-            }
+            context = "\n".join(formatted_articles)
             
-            async with session.get(f"{self.BASE_URL}/everything", params=params) as response:
-                response.raise_for_status()
-                data = await response.json()
-                
-                if data.get("status") != "ok":
-                    raise Exception(f"NewsAPI error: {data.get('message', 'Unknown error')}")
-                
-                articles = []
-                for article_data in data.get("articles", []):
-                    if article_data.get("title") and article_data.get("title") != "[Removed]":
-                        articles.append(NewsArticle(
-                            title=article_data.get("title", ""),
-                            description=article_data.get("description"),
-                            url=article_data.get("url", ""),
-                            source=article_data.get("source", {}).get("name", "Unknown"),
-                            author=article_data.get("author"),
-                            published_at=article_data.get("publishedAt", "")
-                        ))
-                
-                return articles
-                
-        except Exception as e:
-            print(f"Error searching articles: {str(e)}")
-            return []
-
-    async def execute(self, **inputs: Any) -> str:
-        """Execute the NewsAPI tool"""
-        query = inputs.get('query')
-        category = inputs.get('category')
-        country = inputs.get('country', 'us')
-        limit = inputs.get('limit', 5)
-        
-        # Log inputs as JSON
-        input_data = {
-            "query": query,
-            "category": category,
-            "country": country,
-            "limit": limit,
-            "api_source": "NewsAPI"
-        }
-        print(f"NewsAPI Tool Inputs: {json.dumps(input_data, indent=2)}")
-        
-        try:
-            if query:
-                # Search for specific articles
-                articles = await self.search_articles(query, limit)
-            else:
-                # Get top headlines
-                articles = await self.get_top_headlines(country, category, limit)
-            
-            # Prepare output as JSON
+            # Create structured output
             output = {
-                "articles": [article.__dict__ for article in articles],
-                "total_results": len(articles),
-                "query_type": "search" if query else "headlines",
+                "articles": articles,
+                "formatted_context": context,
+                "article_count": len(articles),
+                "requested_limit": limit,
                 "category": category,
-                "country": country,
-                "limit": limit
+                "timestamp": datetime.now().isoformat(),
+                "source": "newsapi"
             }
             
-            # Log output as JSON to console and for Galileo observability
+            # Log output as JSON
             output_log = {
                 "tool_execution": "news_api_tool",
-                "inputs": input_data,
+                "inputs": inputs,
                 "output": output,
                 "metadata": {
-                    "total_results": output["total_results"],
-                    "query_type": output["query_type"],
+                    "article_count": output["article_count"],
+                    "requested_limit": output["requested_limit"],
                     "category": output["category"],
-                    "country": output["country"],
-                    "limit": output["limit"],
-                    "api_source": "NewsAPI"
+                    "timestamp": output["timestamp"]
                 }
             }
-            print(f"NewsAPI Tool Output: {json.dumps(output_log, indent=2)}")
+            print(f"News API Tool Output: {json.dumps(output_log, indent=2)}")
+            
+            # Add span for tool completion
+            logger.add_llm_span(
+                input=f"News articles fetched successfully",
+                output=context,
+                model="news_api",
+                num_input_tokens=len(str(inputs)),
+                num_output_tokens=len(context),
+                total_tokens=len(str(inputs)) + len(context),
+                duration_ns=0
+            )
+            
+            # Conclude the trace successfully
+            logger.conclude(output=context, duration_ns=0)
             
             # Return JSON string for proper Galileo logging display
             galileo_output = {
                 "tool_result": "news_api_tool",
                 "formatted_output": json.dumps(output, indent=2),
-                "articles": output["articles"],
+                "context": context,
                 "metadata": output
             }
             
-            # Return as formatted JSON string for Galileo
             return json.dumps(galileo_output, indent=2)
             
-        finally:
-            # Ensure session is closed
-            if self._session and not self._session.closed:
-                await self._session.close()
+        except Exception as e:
+            # Conclude the trace with error
+            if logger:
+                logger.conclude(output=str(e), duration_ns=0, error=True)
+            
+            raise e
+
+    async def _execute_without_galileo(self, category: str = "business", limit: int = 5) -> str:
+        """Fallback execution without Galileo logging"""
+        if not self.api_key:
+            raise Exception("NEWS_API_KEY not found in environment variables")
+        
+        # Fetch news articles
+        url = f"https://newsapi.org/v2/top-headlines"
+        params = {
+            "country": "us",
+            "category": category,
+            "apiKey": self.api_key,
+            "pageSize": limit
+        }
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params=params) as response:
+                if response.status != 200:
+                    raise Exception(f"Failed to fetch news: {response.status}")
+                
+                data = await response.json()
+                articles = data.get("articles", [])
+        
+        # Format articles for context
+        formatted_articles = []
+        for article in articles:
+            title = article.get("title", "No title")
+            description = article.get("description", "No description")
+            formatted_articles.append(f"• {title}: {description}")
+        
+        context = "\n".join(formatted_articles)
+        
+        # Create structured output
+        output = {
+            "articles": articles,
+            "formatted_context": context,
+            "article_count": len(articles),
+            "requested_limit": limit,
+            "category": category,
+            "timestamp": datetime.now().isoformat(),
+            "source": "newsapi"
+        }
+        
+        # Return as formatted JSON string
+        galileo_output = {
+            "tool_result": "news_api_tool",
+            "formatted_output": json.dumps(output, indent=2),
+            "context": context,
+            "metadata": output
+        }
+        
+        return json.dumps(galileo_output, indent=2)
 
 # Example usage
 if __name__ == "__main__":

@@ -1,11 +1,18 @@
+import os
 import json
 import aiohttp
+from galileo import log
 from typing import Dict, Optional, List, Any
 from dataclasses import dataclass
 from datetime import datetime
 import time
 from agent_framework.models import ToolMetadata
 from agent_framework.tools.base import BaseTool
+from agent_framework.utils.logging import get_galileo_logger
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 @dataclass
 class HNStory:
@@ -74,6 +81,8 @@ class HackerNewsTool(BaseTool):
         self.name = "hackernews_tool"
         self.description = "A tool for interacting with Hacker News API and formatting content in HN style"
         self._session = None
+        # Get the centralized Galileo logger
+        self.galileo_logger = get_galileo_logger()
     
     async def __aenter__(self):
         """Async context manager entry"""
@@ -168,6 +177,7 @@ class HackerNewsTool(BaseTool):
             "type": story.type
         }
 
+    @log(span_type="tool", name="hackernews_tool")
     async def execute(self, **inputs: Any) -> str:
         """Execute the HackerNews tool"""
         story_id = inputs.get('story_id')
@@ -181,7 +191,27 @@ class HackerNewsTool(BaseTool):
         }
         print(f"HackerNews Tool Inputs: {json.dumps(input_data, indent=2)}")
         
+        # Use the centralized Galileo logger
+        logger = self.galileo_logger
+        if not logger:
+            print("⚠️  Warning: Galileo logger not available, proceeding without logging")
+            return await self._execute_without_galileo(limit)
+        
+        # Start individual trace for this tool
+        trace = logger.start_trace(f"HackerNews Tool - Fetching {limit} stories")
+        
         try:
+            # Add span for tool execution start
+            logger.add_llm_span(
+                input=f"Fetching {limit} trending HackerNews stories",
+                output="Tool execution started",
+                model="hackernews_api",
+                num_input_tokens=len(str(input_data)),
+                num_output_tokens=0,
+                total_tokens=len(str(input_data)),
+                duration_ns=0
+            )
+            
             if story_id is not None:
                 story = await self.get_story(story_id)
                 stories = [story.__dict__] if story else []
@@ -215,6 +245,20 @@ class HackerNewsTool(BaseTool):
             }
             print(f"HackerNews Tool Output: {json.dumps(output_log, indent=2)}")
             
+            # Add span for tool completion
+            logger.add_llm_span(
+                input=f"HackerNews stories fetched successfully",
+                output=json.dumps(output, indent=2),
+                model="hackernews_api",
+                num_input_tokens=len(str(input_data)),
+                num_output_tokens=len(json.dumps(output, indent=2)),
+                total_tokens=len(str(input_data)) + len(json.dumps(output, indent=2)),
+                duration_ns=0
+            )
+            
+            # Conclude the trace successfully
+            logger.conclude(output=json.dumps(output, indent=2), duration_ns=0)
+            
             # Return JSON string for proper Galileo logging display
             galileo_output = {
                 "tool_result": "hackernews_tool",
@@ -223,12 +267,67 @@ class HackerNewsTool(BaseTool):
                 "metadata": output
             }
             
-            # Return as formatted JSON string for Galileo
             return json.dumps(galileo_output, indent=2)
-        finally:
-            # Ensure session is closed
-            if self._session and not self._session.closed:
-                await self._session.close()
+        except Exception as e:
+            # Conclude the trace with error
+            if logger:
+                logger.conclude(output=str(e), duration_ns=0, error=True)
+            
+            raise e
+
+    async def _execute_without_galileo(self, limit: int = 3) -> str:
+        """Fallback execution without Galileo logging"""
+        # Fetch top story IDs
+        async with aiohttp.ClientSession() as session:
+            async with session.get('https://hacker-news.firebaseio.com/v0/topstories.json') as response:
+                if response.status != 200:
+                    raise Exception(f"Failed to fetch top stories: {response.status}")
+                
+                story_ids = await response.json()
+                story_ids = story_ids[:limit]  # Get only the requested number
+                
+                # Fetch individual story details
+                stories = []
+                for story_id in story_ids:
+                    async with session.get(f'https://hacker-news.firebaseio.com/v0/item/{story_id}.json') as story_response:
+                        if story_response.status == 200:
+                            story_data = await story_response.json()
+                            if story_data and 'title' in story_data:
+                                stories.append({
+                                    'id': story_data.get('id'),
+                                    'title': story_data.get('title'),
+                                    'url': story_data.get('url'),
+                                    'score': story_data.get('score', 0),
+                                    'by': story_data.get('by'),
+                                    'time': story_data.get('time')
+                                })
+        
+        # Format stories for context
+        formatted_stories = []
+        for story in stories:
+            formatted_stories.append(f"• {story['title']} (Score: {story['score']})")
+        
+        context = "\n".join(formatted_stories)
+        
+        # Create structured output
+        output = {
+            "stories": stories,
+            "formatted_context": context,
+            "story_count": len(stories),
+            "requested_limit": limit,
+            "timestamp": datetime.now().isoformat(),
+            "source": "hackernews"
+        }
+        
+        # Return as formatted JSON string
+        galileo_output = {
+            "tool_result": "hackernews_tool",
+            "formatted_output": json.dumps(output, indent=2),
+            "context": context,
+            "metadata": output
+        }
+        
+        return json.dumps(galileo_output, indent=2)
 
 # Example usage
 if __name__ == "__main__":
