@@ -2,6 +2,7 @@ import os
 import json
 import aiohttp
 from galileo import GalileoLogger  # 🔍 Galileo import - this is the main Galileo logging library
+from galileo import log  # 🔍 Galileo decorator import for tool spans
 from typing import Dict, Any, List
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
@@ -46,6 +47,10 @@ class HackerNewsTool(BaseTool):
             }
         )
 
+    # 👀 GALILEO TOOL SPAN DECORATOR: This decorator creates a tool span for HTTP API calls
+    # Since this tool makes HTTP requests to HackerNews API (not LLM calls), we use span_type="tool"
+    # The name "Tool-HackerNews" will appear in your Galileo dashboard as a tool span
+    @log(span_type="tool", name="Tool-HackerNews")
     async def execute(self, limit: int = 3) -> str:
         """Fetch trending stories from HackerNews"""
         
@@ -70,17 +75,9 @@ class HackerNewsTool(BaseTool):
         trace = logger.start_trace(f"HackerNews Tool - Fetching {limit} stories")
         
         try:
-            # 👀 GALILEO SPAN START: Add an LLM span to mark the beginning of tool execution
-            # This span shows when the tool started working and what inputs it received
-            logger.add_llm_span(
-                input=f"Fetching {limit} trending HackerNews stories",
-                output="Tool execution started",
-                model="hackernews_api",
-                num_input_tokens=len(str(inputs)),
-                num_output_tokens=0,
-                total_tokens=len(str(inputs)),
-                duration_ns=0
-            )
+            # 🔧 TOOL EXECUTION: This tool makes HTTP API calls to HackerNews
+            # Since it's not an LLM call, we don't need LLM spans here
+            # The @log decorator above automatically creates the tool span
             
             # Fetch top story IDs
             async with aiohttp.ClientSession() as session:
@@ -136,19 +133,6 @@ class HackerNewsTool(BaseTool):
                 }
             }
             print(f"HackerNews Tool Output: {json.dumps(output_log, indent=2)}")
-            
-            # 👀 GALILEO SPAN COMPLETION: Add an LLM span to mark successful completion
-            # This span shows the final output and completion status
-            # It includes token counts and the actual result for observability
-            logger.add_llm_span(
-                input=f"HackerNews stories fetched successfully",
-                output=context,
-                model="hackernews_api",
-                num_input_tokens=len(str(inputs)),
-                num_output_tokens=len(context),
-                total_tokens=len(str(inputs)) + len(context),
-                duration_ns=0
-            )
             
             # 👀 GALILEO TRACE CONCLUSION: Successfully conclude the trace
             # This marks the trace as completed successfully in Galileo

@@ -2,6 +2,7 @@ import os
 import json
 import aiohttp
 from galileo import GalileoLogger  # 🔍 Galileo import - this is the main Galileo logging library
+from galileo import log  # 🔍 Galileo decorator import for tool spans
 from typing import Dict, Any, List
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
@@ -51,6 +52,10 @@ class NewsAPITool(BaseTool):
             }
         )
 
+    # 👀 GALILEO TOOL SPAN DECORATOR: This decorator creates a tool span for HTTP API calls
+    # Since this tool makes HTTP requests to NewsAPI (not LLM calls), we use span_type="tool"
+    # The name "Tool-NewsAPI" will appear in your Galileo dashboard as a tool span
+    @log(span_type="tool", name="Tool-NewsAPI")
     async def execute(self, category: str = "business", limit: int = 5) -> str:
         """Fetch business news from NewsAPI"""
         
@@ -76,17 +81,9 @@ class NewsAPITool(BaseTool):
         trace = logger.start_trace(f"News API Tool - Fetching {category} news")
         
         try:
-            # 👀 GALILEO SPAN START: Add an LLM span to mark the beginning of tool execution
-            # This span shows when the tool started working and what inputs it received
-            logger.add_llm_span(
-                input=f"Fetching {limit} {category} news articles",
-                output="Tool execution started",
-                model="news_api",
-                num_input_tokens=len(str(inputs)),
-                num_output_tokens=0,
-                total_tokens=len(str(inputs)),
-                duration_ns=0
-            )
+            # 🔧 TOOL EXECUTION: This tool makes HTTP API calls to NewsAPI
+            # Since it's not an LLM call, we don't need LLM spans here
+            # The @log decorator above automatically creates the tool span
             
             # Get API key from environment
             api_key = os.environ.get("NEWS_API_KEY")
@@ -148,19 +145,6 @@ class NewsAPITool(BaseTool):
                 }
             }
             print(f"News API Tool Output: {json.dumps(output_log, indent=2)}")
-            
-            # 👀 GALILEO SPAN COMPLETION: Add an LLM span to mark successful completion
-            # This span shows the final output and completion status
-            # It includes token counts and the actual result for observability
-            logger.add_llm_span(
-                input=f"News articles fetched successfully",
-                output=context,
-                model="news_api",
-                num_input_tokens=len(str(inputs)),
-                num_output_tokens=len(context),
-                total_tokens=len(str(inputs)) + len(context),
-                duration_ns=0
-            )
             
             # 👀 GALILEO TRACE CONCLUSION: Successfully conclude the trace
             # This marks the trace as completed successfully in Galileo
