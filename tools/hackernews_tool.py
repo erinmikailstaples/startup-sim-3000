@@ -70,6 +70,7 @@ class HackerNewsTool(BaseTool):
         )
     
     def __init__(self):
+        super().__init__()
         self._session = None
     
     async def __aenter__(self):

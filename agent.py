@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 import time
@@ -14,7 +14,7 @@ from agent_framework.state import AgentState
 from agent_framework.models import VerbosityLevel, ToolSelectionHooks, TaskExecution
 from agent_framework.llm.models import LLMConfig
 from agent_framework.llm.openai_provider import OpenAIProvider
-from agent_framework.utils.logging import AgentLogger, get_galileo_logger
+from agent_framework.utils.logging import AgentLogger
 from tools.text_analysis import TextAnalyzerTool
 from tools.keyword_extraction import KeywordExtractorTool
 from tools.startup_simulator import StartupSimulatorTool
@@ -66,9 +66,8 @@ class SimpleAgent(Agent):
         # "silly" = creative/fun pitches, "serious" = professional business plans
         self.mode = mode
         
-        # Initialize Galileo Logger for observability
-        # This helps us track what the agent is doing and debug issues
-        self.galileo_logger = get_galileo_logger()
+        # Galileo logging is handled by the context manager in the Flask route
+        # No need for manual logger initialization here
         
         # Set up Jinja2 template environment for dynamic prompt generation
         # Templates allow us to create flexible prompts based on user input
@@ -255,130 +254,72 @@ class SimpleAgent(Agent):
         }
         print(f"Agent Workflow Start: {json.dumps(workflow_data, indent=2)}")
         
-        # Galileo trace management is handled by the context manager in the Flask route
-        # No need for manual trace creation, conclusion, or flushing here
-
-        # Get context based on mode
-        if self.mode == "serious":
-            # For serious mode, get NewsAPI context
-            try:
-                news_tool_impl = self.tool_registry.get_implementation("news_api_tool")
-                if not news_tool_impl:
-                    raise ValueError("NewsAPI tool not found in registry")
-                
-                # Create an instance and execute it
-                news_tool = news_tool_impl()
-                async with news_tool:
-                    result = await news_tool.execute(category="business", limit=5)
-                    # Parse JSON string result
-                    try:
-                        if isinstance(result, str):
-                            parsed_result = json.loads(result)
-                            articles = parsed_result.get("articles", [])
-                        else:
-                            # Fallback for dict format
-                            articles = result.get("articles", [])
-                        
-                        if articles:
-                            context = "Recent business news:\n"
-                            for article in articles[:3]:
-                                context += f"- {article['title']} ({article['source']})\n"
-                            print("\nContext from NewsAPI:")
-                            print(context)
-                        else:
-                            context = ""
-                    except json.JSONDecodeError as e:
-                        print(f"Error parsing NewsAPI result: {e}")
-                        context = ""
-            except Exception as e:
-                print(f"Warning: Could not fetch news articles: {e}")
-                context = ""
-        else:
-            # For silly mode, get HackerNews context
-            try:
-                hn_tool_impl = self.tool_registry.get_implementation("hackernews_tool")
-                if not hn_tool_impl:
-                    raise ValueError("HackerNews tool not found in registry")
-                
-                # Create an instance and execute it
-                hn_tool = hn_tool_impl()
-                async with hn_tool:
-                    result = await hn_tool.execute(limit=3)
-                    # Parse JSON string result
-                    try:
-                        if isinstance(result, str):
-                            parsed_result = json.loads(result)
-                            stories = parsed_result.get("stories", [])
-                        else:
-                            # Fallback for dict format
-                            stories = result.get("stories", [])
-                        
-                        if stories:
-                            context = "Recent HackerNews stories:\n"
-                            for story in stories:
-                                context += f"- {story['title']}\n"
-                            print("\nContext from HackerNews:")
-                            print(context)
-                        else:
-                            context = ""
-                    except json.JSONDecodeError as e:
-                        print(f"Error parsing HackerNews result: {e}")
-                        context = ""
-            except Exception as e:
-                print(f"Warning: Could not fetch HackerNews stories: {e}")
-                context = ""
-
-        # Execute the main task by calling parent run but intercepting before final format
+        # Initialize Galileo logger for this agent execution
+        logger = GalileoLogger(
+            project=os.environ.get("GALILEO_PROJECT"),
+            log_stream=os.environ.get("GALILEO_LOG_STREAM")
+        )
+        
+        # Start individual trace for this agent workflow
+        trace = logger.start_trace(f"Agent Workflow - {self.mode} mode - {self.agent_id}")
+        
         try:
-            self.current_task = TaskExecution(
-                task_id=str(uuid4()),
-                agent_id=self.agent_id,
-                input=task,
-                start_time=datetime.now(),
-                steps=[]
+            # Add LLM span for workflow start
+            logger.add_llm_span(
+                input=f"Agent workflow started for task: {task}",
+                output="Workflow initialization",
+                model="agent_workflow",
+                num_input_tokens=len(task),
+                num_output_tokens=0,
+                total_tokens=len(task),
+                duration_ns=0
             )
-
-            if self.logger:
-                self.logger.on_agent_start(task)
-
-            # Store the context for use by tools
-            self.context_data = context
-
-            # Create a plan using chain of thought reasoning
-            self._current_plan = await self.plan_task(task)
             
-            # Execute each step in the plan to get raw results
+            # Execute tools based on mode
             results = []
-            for step in self._current_plan.execution_plan:
-                tool_name = step["tool"]
-                
-                # Add LLM span for each tool execution
-                llm_input = {
-                    "tool": tool_name,
-                    "task": task,
-                    "mode": self.mode,
-                    "step_details": step
-                }
-                
-                result = await self._execute_step(step, task, self._current_plan)
-                
-                # Add LLM span to Galileo trace (only if trace was created successfully)
-                if self.galileo_logger is not None:
-                    try:
-                        self.galileo_logger.add_llm_span(
-                            input=json.dumps(llm_input, indent=2),
-                            output=str(result)[:1000] + "..." if len(str(result)) > 1000 else str(result),
-                            model="gpt-4",  # The underlying model used by tools
-                            name=f"{tool_name} Execution"
-                        )
-                    except Exception as e:
-                        print(f"Warning: Could not add LLM span for {tool_name}: {e}")
-                
-                results.append((step["tool"], result))
             
-            # Format the results using our custom HN style
+            if self.mode == "serious":
+                # Get news context first
+                news_tool_class = self.tool_registry.get_implementation("news_api_tool")
+                if news_tool_class:
+                    news_tool = news_tool_class()
+                    news_context = await news_tool.execute(category="business", limit=5)
+                    results.append(("news_api", news_context))
+                
+                # Generate serious startup pitch
+                startup_tool_class = self.tool_registry.get_implementation("serious_startup_simulator")
+                if startup_tool_class:
+                    startup_tool = startup_tool_class()
+                    startup_result = await startup_tool.execute(
+                        industry=industry,
+                        audience=audience,
+                        random_word=random_word,
+                        news_context=news_context if 'news_context' in locals() else ""
+                    )
+                    results.append(("serious_startup_simulator", startup_result))
+            
+            else:  # silly mode
+                # Get HackerNews context first
+                hn_tool_class = self.tool_registry.get_implementation("hackernews_tool")
+                if hn_tool_class:
+                    hn_tool = hn_tool_class()
+                    hn_context = await hn_tool.execute(limit=3)
+                    results.append(("hackernews", hn_context))
+                
+                # Generate silly startup pitch
+                startup_tool_class = self.tool_registry.get_implementation("startup_simulator")
+                if startup_tool_class:
+                    startup_tool = startup_tool_class()
+                    startup_result = await startup_tool.execute(
+                        industry=industry,
+                        audience=audience,
+                        random_word=random_word,
+                        hn_context=hn_context if 'hn_context' in locals() else ""
+                    )
+                    results.append(("startup_simulator", startup_result))
+            
+            # Format the final result
             formatted_result = await self._format_result(task, results)
-            self.current_task.output = formatted_result
             
             # Log workflow completion as JSON
             completion_data = {
@@ -392,23 +333,36 @@ class SimpleAgent(Agent):
             }
             print(f"Agent Workflow Complete: {json.dumps(completion_data, indent=2)}")
             
+            # Add LLM span for workflow completion
+            logger.add_llm_span(
+                input=f"Agent workflow completed successfully",
+                output=formatted_result,
+                model="agent_workflow",
+                num_input_tokens=len(task),
+                num_output_tokens=len(formatted_result),
+                total_tokens=len(task) + len(formatted_result),
+                duration_ns=0
+            )
+            
+            # Conclude the trace successfully
+            logger.conclude(output=formatted_result, duration_ns=0)
+            
+            # Flush the trace to Galileo
+            try:
+                logger.flush()
+                print("✅ Agent workflow trace flushed to Galileo")
+            except Exception as flush_error:
+                print(f"⚠️  Warning: Could not flush agent workflow trace: {flush_error}")
+            
             # Prepare structured JSON output for Galileo workflow logging
             workflow_result = {
-                "workflow_type": "agent_execution",
-                "agent_metadata": {
-                    "agent_id": self.agent_id,
-                    "mode": self.mode,
-                    "tools_registered": list(self.tool_registry.get_all_tools().keys())
-                },
-                "execution_summary": {
-                    "task": task,
-                    "start_time": workflow_data["start_time"],
-                    "end_time": datetime.now().isoformat(),
-                    "tools_used": [result[0] for result in results],
-                    "execution_status": "success"
-                },
+                "agent_id": self.agent_id,
+                "mode": self.mode,
+                "task": task,
                 "final_output": formatted_result,
-                "tool_results": [{"tool": tool_name, "result_preview": str(result)[:200] + "..." if len(str(result)) > 200 else str(result)} for tool_name, result in results]
+                "tools_used": [result[0] for result in results],
+                "execution_status": "success",
+                "timestamp": datetime.now().isoformat()
             }
             
             # Only call on_agent_done after all tools have completed
@@ -419,12 +373,21 @@ class SimpleAgent(Agent):
             return json.dumps(workflow_result, indent=2)
             
         except Exception as e:
-            self.current_task.error = str(e)
-            self.current_task.status = "failed"
-            print(f"Error during task execution: {e}")
-            return f"Error: {str(e)}"
+            # Conclude the trace with error
+            logger.conclude(output=str(e), duration_ns=0)
+            
+            # Flush the error trace
+            try:
+                logger.flush()
+                print("✅ Agent workflow error trace flushed to Galileo")
+            except Exception as flush_error:
+                print(f"⚠️  Warning: Could not flush agent workflow error trace: {flush_error}")
+            
+            raise e
         finally:
-            self.current_task.end_time = datetime.now()
-            if self.current_task.status == "in_progress":
-                self.current_task.status = "completed"
+            # Only set end_time if current_task exists
+            if hasattr(self, 'current_task') and self.current_task is not None:
+                self.current_task.end_time = datetime.now()
+                if self.current_task.status == "in_progress":
+                    self.current_task.status = "completed"
             self._current_plan = None  # Clear the plan 

@@ -77,6 +77,7 @@ class NewsAPITool(BaseTool):
         )
     
     def __init__(self):
+        super().__init__()
         self._session = None
         self.api_key = os.getenv("NEWS_API_KEY")
         if not self.api_key:

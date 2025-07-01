@@ -1,25 +1,29 @@
 import os
 import json
-from galileo.openai import openai
 from galileo import GalileoLogger
+from galileo.openai import openai
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
 import asyncio
 from dotenv import load_dotenv
-from agent_framework.utils.logging import get_galileo_logger
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
+
+# Use the Galileo-wrapped OpenAI client
+client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 class StartupSimulatorTool(BaseTool):
     """Tool for generating a silly startup pitch using OpenAI's API"""
     
     def __init__(self):
-        super().__init__()
-        # Initialize Galileo Logger using centralized instance
-        self.galileo_logger = get_galileo_logger()
+        super().__init__(
+            name="startup_simulator",
+            description="Generate a creative startup pitch using OpenAI's API"
+        )
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
@@ -44,7 +48,7 @@ class StartupSimulatorTool(BaseTool):
         )
 
     async def execute(self, industry: str, audience: str, random_word: str, hn_context: str = "") -> str:
-        """Generate a silly startup pitch using the LLM provider"""
+        """Execute the startup simulator tool with individual Galileo trace"""
         
         # Log inputs as JSON
         inputs = {
@@ -56,64 +60,119 @@ class StartupSimulatorTool(BaseTool):
         }
         print(f"Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Galileo trace management is handled by the context manager
-        # No need for manual trace creation, conclusion, or flushing here
-        
-        hn_context_prompt = ""
-        if hn_context:
-            hn_context_prompt = f"\n\nRecent HackerNews context:\n{hn_context}\n\nUse this context to make your pitch even more creative and relevant to current tech trends."
-        
-        prompt = (
-            f"Create a silly, creative startup pitch in 500 characters or less. "
-            f"The startup is in the '{industry}' industry, targets '{audience}', and must include the word '{random_word}'. "
-            f"Make it fun and a little absurd!"
-            f"{hn_context_prompt}"
+        # Initialize Galileo logger for this tool execution
+        logger = GalileoLogger(
+            project=os.environ.get("GALILEO_PROJECT"),
+            log_stream=os.environ.get("GALILEO_LOG_STREAM")
         )
         
-        # Initialize async OpenAI client with Galileo integration
-        client = openai.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        # Start individual trace for this tool
+        trace = logger.start_trace(f"Startup Simulator - {industry} targeting {audience}")
         
-        # Create messages with Galileo context
-        messages = [{"role": "user", "content": prompt}]
-        
-        # Execute the API call
-        response = await client.chat.completions.create(
-            messages=messages,
-            model="gpt-4"
-        )
-        
-        pitch = response.choices[0].message.content.strip()[:500]
-        
-        # Prepare output as JSON
-        output = {
-            "pitch": pitch,
-            "character_count": len(pitch),
-            "mode": "silly",
-            "timestamp": response.created if hasattr(response, 'created') else None,
-            "hn_context_used": bool(hn_context)
-        }
-        
-        # Log output as JSON to console and for Galileo observability
-        output_log = {
-            "tool_execution": "startup_simulator",
-            "inputs": inputs,
-            "output": output,
-            "metadata": {
-                "character_count": output["character_count"],
-                "mode": output["mode"],
-                "hn_context_used": output["hn_context_used"],
-                "timestamp": output["timestamp"]
+        try:
+            # Add LLM span for tool execution start
+            logger.add_llm_span(
+                input=f"Generate startup pitch for {industry} targeting {audience} with word '{random_word}'",
+                output="Tool execution started",
+                model="startup_simulator",
+                num_input_tokens=len(str(inputs)),
+                num_output_tokens=0,
+                total_tokens=len(str(inputs)),
+                duration_ns=0
+            )
+            
+            # Create the prompt with HackerNews context
+            hn_context_prompt = ""
+            if hn_context:
+                hn_context_prompt = f"\n\nUse these recent HackerNews stories for inspiration:\n{hn_context}"
+            
+            prompt = (
+                f"Generate a creative and engaging startup pitch for a {industry} company "
+                f"targeting {audience}. The pitch must include the word '{random_word}' naturally. "
+                f"Make it fun, innovative, and memorable. Keep it under 500 characters total."
+                f"{hn_context_prompt}"
+            )
+            
+            # Create messages with Galileo context
+            messages = [{"role": "user", "content": prompt}]
+            
+            # Execute the API call
+            response = client.chat.completions.create(
+                messages=messages,
+                model="gpt-4"
+            )
+            
+            # Extract the response
+            pitch = response.choices[0].message.content.strip()
+            
+            # Create structured output
+            output = {
+                "pitch": pitch,
+                "character_count": len(pitch),
+                "mode": "silly",
+                "hn_context_used": bool(hn_context),
+                "timestamp": datetime.now().isoformat(),
+                "model": "gpt-4",
+                "input_tokens": response.usage.prompt_tokens if hasattr(response.usage, 'prompt_tokens') else 0,
+                "output_tokens": response.usage.completion_tokens if hasattr(response.usage, 'completion_tokens') else 0,
+                "total_tokens": response.usage.total_tokens if hasattr(response.usage, 'total_tokens') else 0
             }
-        }
-        print(f"Startup Simulator Output: {json.dumps(output_log, indent=2)}")
-        
-        # Return JSON string for proper Galileo logging display
-        galileo_output = {
-            "tool_result": "startup_simulator",
-            "formatted_output": json.dumps(output, indent=2),
-            "pitch": output["pitch"],
-            "metadata": output
-        }
-        
-        # Return as formatted JSON string for Galileo
-        return json.dumps(galileo_output, indent=2) 
+            
+            # Log output as JSON to console and for Galileo observability
+            output_log = {
+                "tool_execution": "startup_simulator",
+                "inputs": inputs,
+                "output": output,
+                "metadata": {
+                    "character_count": output["character_count"],
+                    "mode": output["mode"],
+                    "hn_context_used": output["hn_context_used"],
+                    "timestamp": output["timestamp"]
+                }
+            }
+            print(f"Startup Simulator Output: {json.dumps(output_log, indent=2)}")
+            
+            # Add LLM span for tool completion with detailed metrics
+            logger.add_llm_span(
+                input=f"Startup pitch generation completed",
+                output=pitch,
+                model="gpt-4",
+                num_input_tokens=output["input_tokens"],
+                num_output_tokens=output["output_tokens"],
+                total_tokens=output["total_tokens"],
+                duration_ns=0
+            )
+            
+            # Conclude the trace successfully
+            logger.conclude(output=pitch, duration_ns=0)
+            
+            # Flush the trace to Galileo
+            try:
+                logger.flush()
+                print("✅ Startup simulator trace flushed to Galileo")
+            except Exception as flush_error:
+                print(f"⚠️  Warning: Could not flush startup simulator trace: {flush_error}")
+            
+            # Return JSON string for proper Galileo logging display
+            galileo_output = {
+                "tool_result": "startup_simulator",
+                "formatted_output": json.dumps(output, indent=2),
+                "pitch": output["pitch"],
+                "metadata": output
+            }
+            
+            # Return as formatted JSON string for Galileo
+            return json.dumps(galileo_output, indent=2)
+            
+        except Exception as e:
+            # Conclude the trace with error
+            logger.conclude(output=str(e), duration_ns=0)
+            
+            # Flush the error trace
+            try:
+                logger.flush()
+                print("✅ Startup simulator error trace flushed to Galileo")
+            except Exception as flush_error:
+                print(f"⚠️  Warning: Could not flush startup simulator error trace: {flush_error}")
+            
+            raise e 

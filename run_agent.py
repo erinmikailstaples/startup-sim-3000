@@ -1,52 +1,29 @@
-import asyncio
-from agent import SimpleAgent
-from agent_framework.llm.openai_provider import OpenAIProvider
-from agent_framework.llm.models import LLMConfig
-from galileo import galileo_context, log
 import os
 from dotenv import load_dotenv
+from galileo import galileo_context
+from galileo.openai import openai
 
-# Load environment variables
+# Load environment variables from .env
 load_dotenv()
 
-@log(span_type="workflow", name="agent_main")
-async def main():
-    # Ensure Galileo environment variables are set
-    if not os.getenv("GALILEO_API_KEY"):
-        print("Warning: GALILEO_API_KEY not set. Galileo logging will be disabled.")
-    
-    # Set up LLM provider
-    llm_provider = OpenAIProvider(config=LLMConfig(model="gpt-4", temperature=0.7))
-
-    # Create agent instance
-    agent = SimpleAgent(llm_provider=llm_provider)
-
-    # Prompt user for input
-    print("\nWhat would you like to do?")
-    print("1. Generate a startup pitch")
-    print("2. Get recent HackerNews stories")
-    print("3. Analyze text")
-    choice = input("\nEnter your choice (1-3): ")
-
-    # Run the agent within Galileo context for proper trace management
-    with galileo_context():
-        if choice == "1":
-            industry = input("Enter an industry: ")
-            audience = input("Enter a target audience: ")
-            random_word = input("Enter a random word: ")
-            task = f"Generate a startup pitch for a {industry} company targeting {audience} that includes the word '{random_word}'"
-        elif choice == "2":
-            task = "Get the top 5 stories from HackerNews and summarize them"
-        elif choice == "3":
-            text = input("Enter text to analyze: ")
-            task = f"Analyze this text and extract key insights: {text}"
-        else:
-            print("Invalid choice!")
-            return
-
-        result = await agent.execute(task)
-        print("\nResult:\n")
-        print(result)
+def call_openai():
+    # This call will be automatically traced by Galileo
+    client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    chat_completion = client.chat.completions.create(
+        messages=[{"role": "user", "content": "Say this is a test"}],
+        model="gpt-4o"
+    )
+    return chat_completion.choices[0].message.content
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Initialize Galileo context globally using env vars
+    galileo_context.init(
+        project=os.environ.get("GALILEO_PROJECT"),
+        log_stream=os.environ.get("GALILEO_LOG_STREAM")
+    )
+    # Optionally, wrap your main logic in a Galileo context for a single trace
+    with galileo_context():
+        result = call_openai()
+        print("OpenAI result:", result)
+        # Only call flush if you want to force-upload traces in a script
+        galileo_context.flush()

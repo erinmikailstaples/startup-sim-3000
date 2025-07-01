@@ -1,25 +1,30 @@
 import os
 import json
-from galileo.openai import openai
 from galileo import GalileoLogger
+from galileo.openai import openai
+from galileo_logger import start_trace, add_llm_span, conclude_trace
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
 import asyncio
 from dotenv import load_dotenv
-from agent_framework.utils.logging import get_galileo_logger
+from datetime import datetime
 
 # Load environment variables
 load_dotenv()
+
+# Use the Galileo-wrapped OpenAI client
+client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 class SeriousStartupSimulatorTool(BaseTool):
     """Tool for generating serious, professional startup pitches"""
     
     def __init__(self):
-        super().__init__()
-        # Initialize Galileo Logger using centralized instance
-        self.galileo_logger = get_galileo_logger()
+        super().__init__(
+            name="serious_startup_simulator",
+            description="Generate a professional startup business plan based on industry, audience, and market trends"
+        )
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
@@ -44,7 +49,7 @@ class SeriousStartupSimulatorTool(BaseTool):
         )
 
     async def execute(self, industry: str, audience: str, random_word: str, news_context: str = "") -> str:
-        """Generate a serious, professional startup pitch"""
+        """Execute the serious startup simulator tool with individual Galileo trace"""
         
         # Log inputs as JSON
         inputs = {
@@ -56,88 +61,122 @@ class SeriousStartupSimulatorTool(BaseTool):
         }
         print(f"Serious Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Galileo trace management is handled by the context manager
-        # No need for manual trace creation, conclusion, or flushing here
-        
-        news_context_prompt = ""
-        if news_context:
-            news_context_prompt = f"\n\nRecent market context:\n{news_context}\n\nUse this context to inform your market analysis and competitive landscape."
-        
-        prompt = f"""
-        You are a business consultant creating a concise startup pitch for a venture capital presentation. 
-
-        Generate a professional, corporate business proposal in EXACTLY 500 characters or less with the following requirements:
-        - Industry: {industry}
-        - Target Market: {audience} 
-        - Core Technology/Concept: Must incorporate "{random_word}" as a key component
-        
-        {news_context_prompt}
-        
-        Create a single, dense paragraph that includes:
-        - Business concept overview
-        - Market opportunity 
-        - Competitive advantage
-        - Revenue model
-        
-        Make this extremely dry and corporate. Use buzzwords like "synergistic value propositions," "scalable infrastructure," "market penetration strategies," and "sustainable competitive advantages."
-        
-        Be formal, avoid humor, and keep it under 500 characters total.
-        """
-        
-        # Initialize async OpenAI client with Galileo integration
-        client = openai.AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        
-        # Create messages
-        messages = [{"role": "user", "content": prompt}]
-        
-        # Execute the API call
-        response = await client.chat.completions.create(
-            messages=messages,
-            model="gpt-4",
-            temperature=0.3  # Lower temperature for more formal, consistent output
+        # Initialize Galileo logger for this tool execution
+        logger = GalileoLogger(
+            project=os.environ.get("GALILEO_PROJECT"),
+            log_stream=os.environ.get("GALILEO_LOG_STREAM")
         )
         
-        content = response.choices[0].message.content.strip()
+        # Start individual trace for this tool
+        trace = logger.start_trace(f"Serious Startup Simulator - {industry} targeting {audience}")
         
-        # Ensure it's under 500 characters
-        if len(content) > 500:
-            content = content[:497] + "..."
-        
-        # Prepare output as JSON
-        output = {
-            "pitch": content,
-            "character_count": len(content),
-            "mode": "serious",
-            "market_analysis": "",
-            "financial_projections": "",
-            "competitive_landscape": "",
-            "timestamp": response.created if hasattr(response, 'created') else None,
-            "news_context_used": bool(news_context)
-        }
-        
-        # Log output as JSON to console and for Galileo observability
-        output_log = {
-            "tool_execution": "serious_startup_simulator",
-            "inputs": inputs,
-            "output": output,
-            "metadata": {
-                "character_count": output["character_count"],
-                "mode": output["mode"],
-                "news_context_used": output["news_context_used"],
-                "timestamp": output["timestamp"]
+        try:
+            # Add LLM span for tool execution start
+            logger.add_llm_span(
+                input=f"Generate business plan for {industry} targeting {audience} with concept '{random_word}'",
+                output="Tool execution started",
+                model="serious_startup_simulator",
+                num_input_tokens=len(str(inputs)),
+                num_output_tokens=0,
+                total_tokens=len(str(inputs)),
+                duration_ns=0
+            )
+            
+            # Create the prompt with news context
+            news_context_prompt = ""
+            if news_context:
+                news_context_prompt = f"\n\nUse these recent business news trends for market analysis:\n{news_context}"
+            
+            prompt = (
+                f"Generate a professional startup business plan for a {industry} company "
+                f"targeting {audience}. The plan must incorporate the concept '{random_word}' naturally. "
+                f"Be formal, avoid humor, and keep it under 500 characters total."
+                f"{news_context_prompt}"
+            )
+            
+            # Create messages
+            messages = [{"role": "user", "content": prompt}]
+            
+            # Execute the API call
+            response = client.chat.completions.create(
+                messages=messages,
+                model="gpt-4",
+                temperature=0.3  # Lower temperature for more professional output
+            )
+            
+            # Extract the response
+            pitch = response.choices[0].message.content.strip()
+            
+            # Create structured output
+            output = {
+                "pitch": pitch,
+                "character_count": len(pitch),
+                "mode": "serious",
+                "news_context_used": bool(news_context),
+                "timestamp": datetime.now().isoformat(),
+                "model": "gpt-4",
+                "input_tokens": response.usage.prompt_tokens if hasattr(response.usage, 'prompt_tokens') else 0,
+                "output_tokens": response.usage.completion_tokens if hasattr(response.usage, 'completion_tokens') else 0,
+                "total_tokens": response.usage.total_tokens if hasattr(response.usage, 'total_tokens') else 0
             }
-        }
-        print(f"Serious Startup Simulator Output: {json.dumps(output_log, indent=2)}")
-        
-        # Return JSON string for proper Galileo logging display
-        galileo_output = {
-            "tool_result": "serious_startup_simulator",
-            "formatted_output": json.dumps(output, indent=2),
-            "pitch": output["pitch"],
-            "metadata": output
-        }
-        
-        return json.dumps(galileo_output, indent=2)
+            
+            # Log output as JSON to console and for Galileo observability
+            output_log = {
+                "tool_execution": "serious_startup_simulator",
+                "inputs": inputs,
+                "output": output,
+                "metadata": {
+                    "character_count": output["character_count"],
+                    "mode": output["mode"],
+                    "news_context_used": output["news_context_used"],
+                    "timestamp": output["timestamp"]
+                }
+            }
+            print(f"Serious Startup Simulator Output: {json.dumps(output_log, indent=2)}")
+            
+            # Add LLM span for tool completion with detailed metrics
+            logger.add_llm_span(
+                input=f"Business plan generation completed",
+                output=pitch,
+                model="gpt-4",
+                num_input_tokens=output["input_tokens"],
+                num_output_tokens=output["output_tokens"],
+                total_tokens=output["total_tokens"],
+                duration_ns=0
+            )
+            
+            # Conclude the trace successfully
+            logger.conclude(output=pitch, duration_ns=0)
+            
+            # Flush the trace to Galileo
+            try:
+                logger.flush()
+                print("✅ Serious startup simulator trace flushed to Galileo")
+            except Exception as flush_error:
+                print(f"⚠️  Warning: Could not flush serious startup simulator trace: {flush_error}")
+            
+            # Return JSON string for proper Galileo logging display
+            galileo_output = {
+                "tool_result": "serious_startup_simulator",
+                "formatted_output": json.dumps(output, indent=2),
+                "pitch": output["pitch"],
+                "metadata": output
+            }
+            
+            return json.dumps(galileo_output, indent=2)
+            
+        except Exception as e:
+            # Conclude the trace with error
+            logger.conclude(output=str(e), duration_ns=0)
+            
+            # Flush the error trace
+            try:
+                logger.flush()
+                print("✅ Serious startup simulator error trace flushed to Galileo")
+            except Exception as flush_error:
+                print(f"⚠️  Warning: Could not flush serious startup simulator error trace: {flush_error}")
+            
+            raise e
     
     def _parse_business_pitch(self, content: str) -> Dict[str, str]:
         """Parse the business pitch into structured sections"""

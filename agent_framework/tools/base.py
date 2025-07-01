@@ -8,6 +8,10 @@ class BaseTool(ABC):
     # Tool metadata as class variables
     metadata: ClassVar[Type[ToolMetadata]]
     
+    def __init__(self):
+        """Initialize the base tool"""
+        pass
+    
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
         """Get tool metadata for planning"""
