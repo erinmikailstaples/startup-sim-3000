@@ -2,11 +2,11 @@ import os
 import json
 from galileo import GalileoLogger
 from galileo.openai import openai
-from galileo_logger import start_trace, add_llm_span, conclude_trace
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
+from agent_framework.utils.logging import get_galileo_logger
 import asyncio
 from dotenv import load_dotenv
 from datetime import datetime
@@ -21,10 +21,11 @@ class SeriousStartupSimulatorTool(BaseTool):
     """Tool for generating serious, professional startup pitches"""
     
     def __init__(self):
-        super().__init__(
-            name="serious_startup_simulator",
-            description="Generate a professional startup business plan based on industry, audience, and market trends"
-        )
+        super().__init__()
+        self.name = "serious_startup_simulator"
+        self.description = "Generate a professional startup business plan based on industry, audience, and market trends"
+        # Get the centralized Galileo logger
+        self.galileo_logger = get_galileo_logger()
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
@@ -61,11 +62,12 @@ class SeriousStartupSimulatorTool(BaseTool):
         }
         print(f"Serious Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Initialize Galileo logger for this tool execution
-        logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+        # Use the centralized Galileo logger
+        logger = self.galileo_logger
+        if not logger:
+            print("⚠️  Warning: Galileo logger not available, proceeding without logging")
+            # Fallback to direct API call without Galileo
+            return await self._execute_without_galileo(industry, audience, random_word, news_context)
         
         # Start individual trace for this tool
         trace = logger.start_trace(f"Serious Startup Simulator - {industry} targeting {audience}")
@@ -148,13 +150,6 @@ class SeriousStartupSimulatorTool(BaseTool):
             # Conclude the trace successfully
             logger.conclude(output=pitch, duration_ns=0)
             
-            # Flush the trace to Galileo
-            try:
-                logger.flush()
-                print("✅ Serious startup simulator trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush serious startup simulator trace: {flush_error}")
-            
             # Return JSON string for proper Galileo logging display
             galileo_output = {
                 "tool_result": "serious_startup_simulator",
@@ -167,16 +162,60 @@ class SeriousStartupSimulatorTool(BaseTool):
             
         except Exception as e:
             # Conclude the trace with error
-            logger.conclude(output=str(e), duration_ns=0)
-            
-            # Flush the error trace
-            try:
-                logger.flush()
-                print("✅ Serious startup simulator error trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush serious startup simulator error trace: {flush_error}")
+            if logger:
+                logger.conclude(output=str(e), duration_ns=0, error=True)
             
             raise e
+
+    async def _execute_without_galileo(self, industry: str, audience: str, random_word: str, news_context: str = "") -> str:
+        """Fallback execution without Galileo logging"""
+        # Create the prompt with news context
+        news_context_prompt = ""
+        if news_context:
+            news_context_prompt = f"\n\nUse these recent business news trends for market analysis:\n{news_context}"
+        
+        prompt = (
+            f"Generate a professional startup business plan for a {industry} company "
+            f"targeting {audience}. The plan must incorporate the concept '{random_word}' naturally. "
+            f"Be formal, avoid humor, and keep it under 500 characters total."
+            f"{news_context_prompt}"
+        )
+        
+        # Create messages
+        messages = [{"role": "user", "content": prompt}]
+        
+        # Execute the API call
+        response = client.chat.completions.create(
+            messages=messages,
+            model="gpt-4",
+            temperature=0.3  # Lower temperature for more professional output
+        )
+        
+        # Extract the response
+        pitch = response.choices[0].message.content.strip()
+        
+        # Create structured output
+        output = {
+            "pitch": pitch,
+            "character_count": len(pitch),
+            "mode": "serious",
+            "news_context_used": bool(news_context),
+            "timestamp": datetime.now().isoformat(),
+            "model": "gpt-4",
+            "input_tokens": response.usage.prompt_tokens if hasattr(response.usage, 'prompt_tokens') else 0,
+            "output_tokens": response.usage.completion_tokens if hasattr(response.usage, 'completion_tokens') else 0,
+            "total_tokens": response.usage.total_tokens if hasattr(response.usage, 'total_tokens') else 0
+        }
+        
+        # Return as formatted JSON string
+        galileo_output = {
+            "tool_result": "serious_startup_simulator",
+            "formatted_output": json.dumps(output, indent=2),
+            "pitch": output["pitch"],
+            "metadata": output
+        }
+        
+        return json.dumps(galileo_output, indent=2)
     
     def _parse_business_pitch(self, content: str) -> Dict[str, str]:
         """Parse the business pitch into structured sections"""

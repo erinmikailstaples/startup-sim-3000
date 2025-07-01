@@ -109,13 +109,6 @@ def generate_startup():
             # Conclude the trace successfully
             logger.conclude(output=final_output, duration_ns=0)
             
-            # Flush the trace to Galileo
-            try:
-                logger.flush()
-                print("✅ Flask API trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush Flask API trace: {flush_error}")
-            
             return jsonify({'result': final_output})
             
         except Exception as e:
@@ -132,13 +125,6 @@ def generate_startup():
             
             # Conclude the trace with error
             logger.conclude(output=str(e), duration_ns=0)
-            
-            # Flush the error trace
-            try:
-                logger.flush()
-                print("✅ Flask API error trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush Flask API error trace: {flush_error}")
             
             raise e
         

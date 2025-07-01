@@ -78,6 +78,8 @@ class NewsAPITool(BaseTool):
     
     def __init__(self):
         super().__init__()
+        self.name = "news_api_tool"
+        self.description = "Fetch recent news articles to check for similar startups and market trends"
         self._session = None
         self.api_key = os.getenv("NEWS_API_KEY")
         if not self.api_key:

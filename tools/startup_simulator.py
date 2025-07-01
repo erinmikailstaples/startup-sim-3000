@@ -6,6 +6,7 @@ from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
+from agent_framework.utils.logging import get_galileo_logger
 import asyncio
 from dotenv import load_dotenv
 from datetime import datetime
@@ -20,10 +21,11 @@ class StartupSimulatorTool(BaseTool):
     """Tool for generating a silly startup pitch using OpenAI's API"""
     
     def __init__(self):
-        super().__init__(
-            name="startup_simulator",
-            description="Generate a creative startup pitch using OpenAI's API"
-        )
+        super().__init__()
+        self.name = "startup_simulator"
+        self.description = "Generate a creative startup pitch based on industry, audience, and a random word"
+        # Get the centralized Galileo logger
+        self.galileo_logger = get_galileo_logger()
 
     @classmethod
     def get_metadata(cls) -> ToolMetadata:
@@ -60,11 +62,12 @@ class StartupSimulatorTool(BaseTool):
         }
         print(f"Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Initialize Galileo logger for this tool execution
-        logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+        # Use the centralized Galileo logger
+        logger = self.galileo_logger
+        if not logger:
+            print("⚠️  Warning: Galileo logger not available, proceeding without logging")
+            # Fallback to direct API call without Galileo
+            return await self._execute_without_galileo(industry, audience, random_word, hn_context)
         
         # Start individual trace for this tool
         trace = logger.start_trace(f"Startup Simulator - {industry} targeting {audience}")
@@ -146,13 +149,6 @@ class StartupSimulatorTool(BaseTool):
             # Conclude the trace successfully
             logger.conclude(output=pitch, duration_ns=0)
             
-            # Flush the trace to Galileo
-            try:
-                logger.flush()
-                print("✅ Startup simulator trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush startup simulator trace: {flush_error}")
-            
             # Return JSON string for proper Galileo logging display
             galileo_output = {
                 "tool_result": "startup_simulator",
@@ -166,13 +162,56 @@ class StartupSimulatorTool(BaseTool):
             
         except Exception as e:
             # Conclude the trace with error
-            logger.conclude(output=str(e), duration_ns=0)
+            if logger:
+                logger.conclude(output=str(e), duration_ns=0, error=True)
             
-            # Flush the error trace
-            try:
-                logger.flush()
-                print("✅ Startup simulator error trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush startup simulator error trace: {flush_error}")
-            
-            raise e 
+            raise e
+
+    async def _execute_without_galileo(self, industry: str, audience: str, random_word: str, hn_context: str = "") -> str:
+        """Fallback execution without Galileo logging"""
+        # Create the prompt with HackerNews context
+        hn_context_prompt = ""
+        if hn_context:
+            hn_context_prompt = f"\n\nUse these recent HackerNews stories for inspiration:\n{hn_context}"
+        
+        prompt = (
+            f"Generate a creative and engaging startup pitch for a {industry} company "
+            f"targeting {audience}. The pitch must include the word '{random_word}' naturally. "
+            f"Make it fun, innovative, and memorable. Keep it under 500 characters total."
+            f"{hn_context_prompt}"
+        )
+        
+        # Create messages
+        messages = [{"role": "user", "content": prompt}]
+        
+        # Execute the API call
+        response = client.chat.completions.create(
+            messages=messages,
+            model="gpt-4"
+        )
+        
+        # Extract the response
+        pitch = response.choices[0].message.content.strip()
+        
+        # Create structured output
+        output = {
+            "pitch": pitch,
+            "character_count": len(pitch),
+            "mode": "silly",
+            "hn_context_used": bool(hn_context),
+            "timestamp": datetime.now().isoformat(),
+            "model": "gpt-4",
+            "input_tokens": response.usage.prompt_tokens if hasattr(response.usage, 'prompt_tokens') else 0,
+            "output_tokens": response.usage.completion_tokens if hasattr(response.usage, 'completion_tokens') else 0,
+            "total_tokens": response.usage.total_tokens if hasattr(response.usage, 'total_tokens') else 0
+        }
+        
+        # Return as formatted JSON string
+        galileo_output = {
+            "tool_result": "startup_simulator",
+            "formatted_output": json.dumps(output, indent=2),
+            "pitch": output["pitch"],
+            "metadata": output
+        }
+        
+        return json.dumps(galileo_output, indent=2) 

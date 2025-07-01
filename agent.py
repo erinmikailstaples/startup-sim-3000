@@ -347,13 +347,6 @@ class SimpleAgent(Agent):
             # Conclude the trace successfully
             logger.conclude(output=formatted_result, duration_ns=0)
             
-            # Flush the trace to Galileo
-            try:
-                logger.flush()
-                print("✅ Agent workflow trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush agent workflow trace: {flush_error}")
-            
             # Prepare structured JSON output for Galileo workflow logging
             workflow_result = {
                 "agent_id": self.agent_id,
@@ -375,13 +368,6 @@ class SimpleAgent(Agent):
         except Exception as e:
             # Conclude the trace with error
             logger.conclude(output=str(e), duration_ns=0)
-            
-            # Flush the error trace
-            try:
-                logger.flush()
-                print("✅ Agent workflow error trace flushed to Galileo")
-            except Exception as flush_error:
-                print(f"⚠️  Warning: Could not flush agent workflow error trace: {flush_error}")
             
             raise e
         finally:

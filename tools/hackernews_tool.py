@@ -71,6 +71,8 @@ class HackerNewsTool(BaseTool):
     
     def __init__(self):
         super().__init__()
+        self.name = "hackernews_tool"
+        self.description = "A tool for interacting with Hacker News API and formatting content in HN style"
         self._session = None
     
     async def __aenter__(self):
