@@ -1,11 +1,11 @@
 import os
 import json
 import aiohttp
-from galileo import GalileoLogger
+from galileo import GalileoLogger  # 🔍 Galileo import - this is the main Galileo logging library
 from typing import Dict, Any, List
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
-from agent_framework.utils.logging import get_galileo_logger
+from agent_framework.utils.logging import get_galileo_logger  # 🔍 Galileo helper import - gets centralized logger
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -19,7 +19,8 @@ class NewsAPITool(BaseTool):
         super().__init__()
         self.name = "news_api_tool"
         self.description = "Fetch business news from NewsAPI for market analysis"
-        # Get the centralized Galileo logger
+        # 👀 GALILEO INITIALIZATION: Get the centralized Galileo logger instance
+        # This ensures all tools use the same Galileo configuration and connection
         self.galileo_logger = get_galileo_logger()
 
     @classmethod
@@ -61,17 +62,22 @@ class NewsAPITool(BaseTool):
         }
         print(f"News API Tool Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Use the centralized Galileo logger
+        # 👀 GALILEO LOGGER SETUP: Get the Galileo logger for this execution
+        # This logger will be used to create traces and spans for observability
         logger = self.galileo_logger
         if not logger:
             print("⚠️  Warning: Galileo logger not available, proceeding without logging")
+            # ℹ️ FALLBACK: If Galileo is not available, use the non-logging version
             return await self._execute_without_galileo(category, limit)
         
-        # Start individual trace for this tool
+        # 👀 GALILEO TRACE START: Create a new trace for this tool execution
+        # A trace represents the entire lifecycle of this tool call
+        # This will appear as a top-level trace in your Galileo dashboard
         trace = logger.start_trace(f"News API Tool - Fetching {category} news")
         
         try:
-            # Add span for tool execution start
+            # 👀 GALILEO SPAN START: Add an LLM span to mark the beginning of tool execution
+            # This span shows when the tool started working and what inputs it received
             logger.add_llm_span(
                 input=f"Fetching {limit} {category} news articles",
                 output="Tool execution started",
@@ -143,7 +149,9 @@ class NewsAPITool(BaseTool):
             }
             print(f"News API Tool Output: {json.dumps(output_log, indent=2)}")
             
-            # Add span for tool completion
+            # 👀 GALILEO SPAN COMPLETION: Add an LLM span to mark successful completion
+            # This span shows the final output and completion status
+            # It includes token counts and the actual result for observability
             logger.add_llm_span(
                 input=f"News articles fetched successfully",
                 output=context,
@@ -154,7 +162,9 @@ class NewsAPITool(BaseTool):
                 duration_ns=0
             )
             
-            # Conclude the trace successfully
+            # 👀 GALILEO TRACE CONCLUSION: Successfully conclude the trace
+            # This marks the trace as completed successfully in Galileo
+            # The trace will show as "success" in your dashboard
             logger.conclude(output=context, duration_ns=0)
             
             # Return JSON string for proper Galileo logging display
@@ -168,7 +178,9 @@ class NewsAPITool(BaseTool):
             return json.dumps(galileo_output, indent=2)
             
         except Exception as e:
-            # Conclude the trace with error
+            # 👀 GALILEO ERROR HANDLING: Conclude the trace with error status
+            # This marks the trace as failed in Galileo and includes the error message
+            # The trace will show as "error" in your dashboard with error details
             if logger:
                 logger.conclude(output=str(e), duration_ns=0, error=True)
             
@@ -176,6 +188,8 @@ class NewsAPITool(BaseTool):
 
     async def _execute_without_galileo(self, category: str = "business", limit: int = 5) -> str:
         """Fallback execution without Galileo logging"""
+        # ℹ️ FALLBACK METHOD: This method runs when Galileo is not available
+        # It performs the same functionality but without any observability logging
         # Get API key from environment
         api_key = os.environ.get("NEWS_API_KEY")
         if not api_key:
@@ -223,7 +237,7 @@ class NewsAPITool(BaseTool):
             "source": "newsapi"
         }
         
-        # Return as formatted JSON string
+        # Return JSON string for proper Galileo logging display
         galileo_output = {
             "tool_result": "news_api_tool",
             "formatted_output": json.dumps(output, indent=2),
@@ -233,20 +247,13 @@ class NewsAPITool(BaseTool):
         
         return json.dumps(galileo_output, indent=2)
 
-# Example usage
+# ℹ️ TEST FUNCTION: This function can be used to test the tool independently
+async def main():
+    """Test the News API tool"""
+    tool = NewsAPITool()
+    result = await tool.execute(category="business", limit=3)
+    print(f"Result: {result}")
+
 if __name__ == "__main__":
-    async def main():
-        async with NewsAPITool() as news:
-            # Test top headlines
-            result = await news.execute(category="business", limit=3)
-            print("Top Business Headlines:")
-            for article in result["articles"]:
-                print(f"- {article['title']} ({article['source']})")
-            
-            # Test search
-            result = await news.execute(query="startup funding", limit=3)
-            print("\nStartup Funding News:")
-            for article in result["articles"]:
-                print(f"- {article['title']} ({article['source']})")
-    
+    import asyncio
     asyncio.run(main())

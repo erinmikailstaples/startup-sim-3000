@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 from uuid import uuid4
 from datetime import datetime
-from galileo import log
+from galileo import log  # 🔍 Galileo import - this is the main Galileo logging library
 from .utils.logging import AgentLogger
 from .utils.tool_registry import ToolRegistry
 
@@ -83,6 +83,9 @@ class Agent(ABC):
             plan=self._current_plan  # Pass the current plan in the context
         )
 
+    # 👀 GALILEO DECORATOR: This decorator automatically creates a span for tool execution
+    # The @log decorator wraps this method and automatically logs it to Galileo
+    # This means every tool call will be tracked in your Galileo dashboard
     @log(span_type="tool", name="tool_execution")
     async def call_tool(
         self,

@@ -1,12 +1,12 @@
 import os
 import json
-from galileo import GalileoLogger
-from galileo.openai import openai
+from galileo import GalileoLogger  # 🔍 Galileo import - this is the main Galileo logging library
+from galileo.openai import openai  # 🔍 Galileo-wrapped OpenAI client for automatic logging
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
-from agent_framework.utils.logging import get_galileo_logger
+from agent_framework.utils.logging import get_galileo_logger  # 🔍 Galileo helper import - gets centralized logger
 import asyncio
 from dotenv import load_dotenv
 from datetime import datetime
@@ -14,7 +14,8 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Use the Galileo-wrapped OpenAI client
+# 👀 GALILEO-WRAPPED OPENAI CLIENT: Use Galileo's OpenAI wrapper for automatic LLM logging
+# This automatically logs all OpenAI API calls to Galileo with detailed metrics
 client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 class SeriousStartupSimulatorTool(BaseTool):
@@ -24,7 +25,8 @@ class SeriousStartupSimulatorTool(BaseTool):
         super().__init__()
         self.name = "serious_startup_simulator"
         self.description = "Generate a professional startup business plan based on industry, audience, and market trends"
-        # Get the centralized Galileo logger
+        # 👀 GALILEO INITIALIZATION: Get the centralized Galileo logger instance
+        # This ensures all tools use the same Galileo configuration and connection
         self.galileo_logger = get_galileo_logger()
 
     @classmethod
@@ -62,18 +64,22 @@ class SeriousStartupSimulatorTool(BaseTool):
         }
         print(f"Serious Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Use the centralized Galileo logger
+        # 👀 GALILEO LOGGER SETUP: Get the Galileo logger for this execution
+        # This logger will be used to create traces and spans for observability
         logger = self.galileo_logger
         if not logger:
             print("⚠️  Warning: Galileo logger not available, proceeding without logging")
-            # Fallback to direct API call without Galileo
+            # ℹ️ FALLBACK: If Galileo is not available, use the non-logging version
             return await self._execute_without_galileo(industry, audience, random_word, news_context)
         
-        # Start individual trace for this tool
+        # 👀 GALILEO TRACE START: Create a new trace for this tool execution
+        # A trace represents the entire lifecycle of this tool call
+        # This will appear as a top-level trace in your Galileo dashboard
         trace = logger.start_trace(f"Serious Startup Simulator - {industry} targeting {audience}")
         
         try:
-            # Add LLM span for tool execution start
+            # 👀 GALILEO SPAN START: Add an LLM span to mark the beginning of tool execution
+            # This span shows when the tool started working and what inputs it received
             logger.add_llm_span(
                 input=f"Generate business plan for {industry} targeting {audience} with concept '{random_word}'",
                 output="Tool execution started",
@@ -99,7 +105,9 @@ class SeriousStartupSimulatorTool(BaseTool):
             # Create messages
             messages = [{"role": "user", "content": prompt}]
             
-            # Execute the API call
+            # 👀 GALILEO-ENHANCED API CALL: Execute the API call using Galileo-wrapped OpenAI client
+            # This automatically logs the LLM call to Galileo with detailed metrics
+            # You'll see input/output tokens, model used, and response in your Galileo dashboard
             response = client.chat.completions.create(
                 messages=messages,
                 model="gpt-4",
@@ -136,7 +144,9 @@ class SeriousStartupSimulatorTool(BaseTool):
             }
             print(f"Serious Startup Simulator Output: {json.dumps(output_log, indent=2)}")
             
-            # Add LLM span for tool completion with detailed metrics
+            # 👀 GALILEO SPAN COMPLETION: Add an LLM span to mark successful completion
+            # This span shows the final output and completion status
+            # It includes token counts and the actual result for observability
             logger.add_llm_span(
                 input=f"Business plan generation completed",
                 output=pitch,
@@ -147,7 +157,9 @@ class SeriousStartupSimulatorTool(BaseTool):
                 duration_ns=0
             )
             
-            # Conclude the trace successfully
+            # 👀 GALILEO TRACE CONCLUSION: Successfully conclude the trace
+            # This marks the trace as completed successfully in Galileo
+            # The trace will show as "success" in your dashboard
             logger.conclude(output=pitch, duration_ns=0)
             
             # Return JSON string for proper Galileo logging display
@@ -161,7 +173,9 @@ class SeriousStartupSimulatorTool(BaseTool):
             return json.dumps(galileo_output, indent=2)
             
         except Exception as e:
-            # Conclude the trace with error
+            # 👀 GALILEO ERROR HANDLING: Conclude the trace with error status
+            # This marks the trace as failed in Galileo and includes the error message
+            # The trace will show as "error" in your dashboard with error details
             if logger:
                 logger.conclude(output=str(e), duration_ns=0, error=True)
             
@@ -169,6 +183,8 @@ class SeriousStartupSimulatorTool(BaseTool):
 
     async def _execute_without_galileo(self, industry: str, audience: str, random_word: str, news_context: str = "") -> str:
         """Fallback execution without Galileo logging"""
+        # ℹ️ FALLBACK METHOD: This method runs when Galileo is not available
+        # It performs the same functionality but without any observability logging
         # Create the prompt with news context
         news_context_prompt = ""
         if news_context:
@@ -207,7 +223,7 @@ class SeriousStartupSimulatorTool(BaseTool):
             "total_tokens": response.usage.total_tokens if hasattr(response.usage, 'total_tokens') else 0
         }
         
-        # Return as formatted JSON string
+        # Return JSON string for proper Galileo logging display
         galileo_output = {
             "tool_result": "serious_startup_simulator",
             "formatted_output": json.dumps(output, indent=2),
@@ -216,40 +232,27 @@ class SeriousStartupSimulatorTool(BaseTool):
         }
         
         return json.dumps(galileo_output, indent=2)
-    
+
     def _parse_business_pitch(self, content: str) -> Dict[str, str]:
-        """Parse the business pitch into structured sections"""
-        sections = {}
-        
-        # Simple parsing - look for section headers
-        current_section = None
-        current_content = []
-        
-        for line in content.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            # Check if this is a section header
-            if any(header in line.upper() for header in ['EXECUTIVE SUMMARY', 'MARKET ANALYSIS', 'COMPETITIVE LANDSCAPE', 'FINANCIAL PROJECTIONS']):
-                if current_section:
-                    sections[current_section] = '\n'.join(current_content).strip()
-                
-                if 'MARKET ANALYSIS' in line.upper():
-                    current_section = 'market_analysis'
-                elif 'COMPETITIVE LANDSCAPE' in line.upper():
-                    current_section = 'competitive_landscape'
-                elif 'FINANCIAL PROJECTIONS' in line.upper():
-                    current_section = 'financial_projections'
-                else:
-                    current_section = 'executive_summary'
-                
-                current_content = []
-            else:
-                current_content.append(line)
-        
-        # Don't forget the last section
-        if current_section and current_content:
-            sections[current_section] = '\n'.join(current_content).strip()
-        
-        return sections
+        """Parse the business pitch into structured components"""
+        # This method could be enhanced to extract specific business plan sections
+        # For now, it returns a simple structure
+        return {
+            "executive_summary": content[:200] + "..." if len(content) > 200 else content,
+            "full_pitch": content
+        }
+
+# ℹ️ TEST FUNCTION: This function can be used to test the tool independently
+async def main():
+    """Test the Serious Startup Simulator tool"""
+    tool = SeriousStartupSimulatorTool()
+    result = await tool.execute(
+        industry="Finance", 
+        audience="Investors", 
+        random_word="fintech",
+        news_context="Sample news context for testing"
+    )
+    print(f"Result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main())

@@ -1,12 +1,12 @@
 import os
 import json
-from galileo import GalileoLogger
-from galileo.openai import openai
+from galileo import GalileoLogger  # 🔍 Galileo import - this is the main Galileo logging library
+from galileo.openai import openai  # 🔍 Galileo-wrapped OpenAI client for automatic logging
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
 from agent_framework.llm.models import LLMMessage
-from agent_framework.utils.logging import get_galileo_logger
+from agent_framework.utils.logging import get_galileo_logger  # 🔍 Galileo helper import - gets centralized logger
 import asyncio
 from dotenv import load_dotenv
 from datetime import datetime
@@ -14,7 +14,8 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Use the Galileo-wrapped OpenAI client
+# 👀 GALILEO-WRAPPED OPENAI CLIENT: Use Galileo's OpenAI wrapper for automatic LLM logging
+# This automatically logs all OpenAI API calls to Galileo with detailed metrics
 client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 class StartupSimulatorTool(BaseTool):
@@ -24,7 +25,8 @@ class StartupSimulatorTool(BaseTool):
         super().__init__()
         self.name = "startup_simulator"
         self.description = "Generate a creative startup pitch based on industry, audience, and a random word"
-        # Get the centralized Galileo logger
+        # 👀 GALILEO INITIALIZATION: Get the centralized Galileo logger instance
+        # This ensures all tools use the same Galileo configuration and connection
         self.galileo_logger = get_galileo_logger()
 
     @classmethod
@@ -62,18 +64,22 @@ class StartupSimulatorTool(BaseTool):
         }
         print(f"Startup Simulator Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Use the centralized Galileo logger
+        # 👀 GALILEO LOGGER SETUP: Get the Galileo logger for this execution
+        # This logger will be used to create traces and spans for observability
         logger = self.galileo_logger
         if not logger:
             print("⚠️  Warning: Galileo logger not available, proceeding without logging")
-            # Fallback to direct API call without Galileo
+            # ℹ️ FALLBACK: If Galileo is not available, use the non-logging version
             return await self._execute_without_galileo(industry, audience, random_word, hn_context)
         
-        # Start individual trace for this tool
+        # 👀 GALILEO TRACE START: Create a new trace for this tool execution
+        # A trace represents the entire lifecycle of this tool call
+        # This will appear as a top-level trace in your Galileo dashboard
         trace = logger.start_trace(f"Startup Simulator - {industry} targeting {audience}")
         
         try:
-            # Add LLM span for tool execution start
+            # 👀 GALILEO SPAN START: Add an LLM span to mark the beginning of tool execution
+            # This span shows when the tool started working and what inputs it received
             logger.add_llm_span(
                 input=f"Generate startup pitch for {industry} targeting {audience} with word '{random_word}'",
                 output="Tool execution started",
@@ -99,7 +105,9 @@ class StartupSimulatorTool(BaseTool):
             # Create messages with Galileo context
             messages = [{"role": "user", "content": prompt}]
             
-            # Execute the API call
+            # 👀 GALILEO-ENHANCED API CALL: Execute the API call using Galileo-wrapped OpenAI client
+            # This automatically logs the LLM call to Galileo with detailed metrics
+            # You'll see input/output tokens, model used, and response in your Galileo dashboard
             response = client.chat.completions.create(
                 messages=messages,
                 model="gpt-4"
@@ -135,7 +143,9 @@ class StartupSimulatorTool(BaseTool):
             }
             print(f"Startup Simulator Output: {json.dumps(output_log, indent=2)}")
             
-            # Add LLM span for tool completion with detailed metrics
+            # 👀 GALILEO SPAN COMPLETION: Add an LLM span to mark successful completion
+            # This span shows the final output and completion status
+            # It includes token counts and the actual result for observability
             logger.add_llm_span(
                 input=f"Startup pitch generation completed",
                 output=pitch,
@@ -146,7 +156,9 @@ class StartupSimulatorTool(BaseTool):
                 duration_ns=0
             )
             
-            # Conclude the trace successfully
+            # 👀 GALILEO TRACE CONCLUSION: Successfully conclude the trace
+            # This marks the trace as completed successfully in Galileo
+            # The trace will show as "success" in your dashboard
             logger.conclude(output=pitch, duration_ns=0)
             
             # Return JSON string for proper Galileo logging display
@@ -161,7 +173,9 @@ class StartupSimulatorTool(BaseTool):
             return json.dumps(galileo_output, indent=2)
             
         except Exception as e:
-            # Conclude the trace with error
+            # 👀 GALILEO ERROR HANDLING: Conclude the trace with error status
+            # This marks the trace as failed in Galileo and includes the error message
+            # The trace will show as "error" in your dashboard with error details
             if logger:
                 logger.conclude(output=str(e), duration_ns=0, error=True)
             
@@ -169,6 +183,8 @@ class StartupSimulatorTool(BaseTool):
 
     async def _execute_without_galileo(self, industry: str, audience: str, random_word: str, hn_context: str = "") -> str:
         """Fallback execution without Galileo logging"""
+        # ℹ️ FALLBACK METHOD: This method runs when Galileo is not available
+        # It performs the same functionality but without any observability logging
         # Create the prompt with HackerNews context
         hn_context_prompt = ""
         if hn_context:
@@ -206,7 +222,7 @@ class StartupSimulatorTool(BaseTool):
             "total_tokens": response.usage.total_tokens if hasattr(response.usage, 'total_tokens') else 0
         }
         
-        # Return as formatted JSON string
+        # Return JSON string for proper Galileo logging display
         galileo_output = {
             "tool_result": "startup_simulator",
             "formatted_output": json.dumps(output, indent=2),
@@ -214,4 +230,19 @@ class StartupSimulatorTool(BaseTool):
             "metadata": output
         }
         
-        return json.dumps(galileo_output, indent=2) 
+        return json.dumps(galileo_output, indent=2)
+
+# ℹ️ TEST FUNCTION: This function can be used to test the tool independently
+async def main():
+    """Test the Startup Simulator tool"""
+    tool = StartupSimulatorTool()
+    result = await tool.execute(
+        industry="Tech", 
+        audience="Developers", 
+        random_word="blockchain",
+        hn_context="Sample HN context for testing"
+    )
+    print(f"Result: {result}")
+
+if __name__ == "__main__":
+    asyncio.run(main()) 

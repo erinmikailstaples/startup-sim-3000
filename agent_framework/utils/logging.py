@@ -26,7 +26,8 @@ theme = Theme({
 
 console = Console(theme=theme)
 
-# Global Galileo logger instance for consistent initialization
+# 👀 GALILEO GLOBAL VARIABLE: This holds the centralized Galileo logger instance
+# This ensures all parts of the application use the same Galileo connection
 _global_galileo_logger = None
 
 def get_galileo_logger():
@@ -40,19 +41,28 @@ def get_galileo_logger():
         # Load environment variables
         load_dotenv()
         
+        # 👀 GALILEO API KEY CHECK: Get the Galileo API key from environment variables
+        # This key is required to authenticate with the Galileo service
         api_key = os.getenv("GALILEO_API_KEY")
         
         if api_key:
             try:
+                # 👀 GALILEO IMPORT: Import the GalileoLogger class from the galileo library
+                # This is the main class that handles all Galileo logging functionality
                 from galileo import GalileoLogger
-                # Use GalileoLogger without parameters - it will use env vars automatically
+                
+                # 👀 GALILEO INITIALIZATION: Create a new GalileoLogger instance
+                # This logger will automatically use environment variables for configuration:
+                # - GALILEO_API_KEY: Your API key for authentication
+                # - GALILEO_PROJECT: Your project name/ID
+                # - GALILEO_LOG_STREAM: The log stream to use
                 _global_galileo_logger = GalileoLogger()
-                print(f"Galileo logger initialized successfully using environment variables")
+                print(f"✅ Galileo logger initialized successfully using environment variables")
             except Exception as e:
-                print(f"Warning: Could not initialize Galileo logger: {e}")
+                print(f"⚠️  Warning: Could not initialize Galileo logger: {e}")
                 _global_galileo_logger = None
         else:
-            print("Warning: GALILEO_API_KEY not set. Galileo logging will be disabled.")
+            print("⚠️  Warning: GALILEO_API_KEY not set. Galileo logging will be disabled.")
             _global_galileo_logger = None
     
     return _global_galileo_logger

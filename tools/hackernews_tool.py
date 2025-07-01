@@ -1,11 +1,11 @@
 import os
 import json
 import aiohttp
-from galileo import GalileoLogger
+from galileo import GalileoLogger  # 🔍 Galileo import - this is the main Galileo logging library
 from typing import Dict, Any, List
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
-from agent_framework.utils.logging import get_galileo_logger
+from agent_framework.utils.logging import get_galileo_logger  # 🔍 Galileo helper import - gets centralized logger
 from dotenv import load_dotenv
 from datetime import datetime
 
@@ -19,7 +19,8 @@ class HackerNewsTool(BaseTool):
         super().__init__()
         self.name = "hackernews_tool"
         self.description = "Fetch trending stories from HackerNews for creative inspiration"
-        # Get the centralized Galileo logger
+        # 👀 GALILEO INITIALIZATION: Get the centralized Galileo logger instance
+        # This ensures all tools use the same Galileo configuration and connection
         self.galileo_logger = get_galileo_logger()
 
     @classmethod
@@ -55,17 +56,22 @@ class HackerNewsTool(BaseTool):
         }
         print(f"HackerNews Tool Inputs: {json.dumps(inputs, indent=2)}")
         
-        # Use the centralized Galileo logger
+        # 👀 GALILEO LOGGER SETUP: Get the Galileo logger for this execution
+        # This logger will be used to create traces and spans for observability
         logger = self.galileo_logger
         if not logger:
             print("⚠️  Warning: Galileo logger not available, proceeding without logging")
+            # ℹ️ FALLBACK: If Galileo is not available, use the non-logging version
             return await self._execute_without_galileo(limit)
         
-        # Start individual trace for this tool
+        # 👀 GALILEO TRACE START: Create a new trace for this tool execution
+        # A trace represents the entire lifecycle of this tool call
+        # This will appear as a top-level trace in your Galileo dashboard
         trace = logger.start_trace(f"HackerNews Tool - Fetching {limit} stories")
         
         try:
-            # Add span for tool execution start
+            # 👀 GALILEO SPAN START: Add an LLM span to mark the beginning of tool execution
+            # This span shows when the tool started working and what inputs it received
             logger.add_llm_span(
                 input=f"Fetching {limit} trending HackerNews stories",
                 output="Tool execution started",
@@ -131,7 +137,9 @@ class HackerNewsTool(BaseTool):
             }
             print(f"HackerNews Tool Output: {json.dumps(output_log, indent=2)}")
             
-            # Add span for tool completion
+            # 👀 GALILEO SPAN COMPLETION: Add an LLM span to mark successful completion
+            # This span shows the final output and completion status
+            # It includes token counts and the actual result for observability
             logger.add_llm_span(
                 input=f"HackerNews stories fetched successfully",
                 output=context,
@@ -142,7 +150,9 @@ class HackerNewsTool(BaseTool):
                 duration_ns=0
             )
             
-            # Conclude the trace successfully
+            # 👀 GALILEO TRACE CONCLUSION: Successfully conclude the trace
+            # This marks the trace as completed successfully in Galileo
+            # The trace will show as "success" in your dashboard
             logger.conclude(output=context, duration_ns=0)
             
             # Return JSON string for proper Galileo logging display
@@ -156,7 +166,9 @@ class HackerNewsTool(BaseTool):
             return json.dumps(galileo_output, indent=2)
             
         except Exception as e:
-            # Conclude the trace with error
+            # 👀 GALILEO ERROR HANDLING: Conclude the trace with error status
+            # This marks the trace as failed in Galileo and includes the error message
+            # The trace will show as "error" in your dashboard with error details
             if logger:
                 logger.conclude(output=str(e), duration_ns=0, error=True)
             
@@ -164,6 +176,8 @@ class HackerNewsTool(BaseTool):
 
     async def _execute_without_galileo(self, limit: int = 3) -> str:
         """Fallback execution without Galileo logging"""
+        # ℹ️ FALLBACK METHOD: This method runs when Galileo is not available
+        # It performs the same functionality but without any observability logging
         # Fetch top story IDs
         async with aiohttp.ClientSession() as session:
             async with session.get('https://hacker-news.firebaseio.com/v0/topstories.json') as response:
@@ -206,7 +220,7 @@ class HackerNewsTool(BaseTool):
             "source": "hackernews"
         }
         
-        # Return as formatted JSON string
+        # Return JSON string for proper Galileo logging display
         galileo_output = {
             "tool_result": "hackernews_tool",
             "formatted_output": json.dumps(output, indent=2),
@@ -216,15 +230,13 @@ class HackerNewsTool(BaseTool):
         
         return json.dumps(galileo_output, indent=2)
 
-# Example usage
-if __name__ == "__main__":
-    async def main():
-        async with HackerNewsTool() as hn:
-            top_stories = await hn.get_top_stories(limit=1)
-            if top_stories:
-                story = await hn.get_story(top_stories[0])
-                if story:
-                    print(hn.format_story_text(story))
+# ℹ️ TEST FUNCTION: This function can be used to test the tool independently
+async def main():
+    """Test the HackerNews tool"""
+    tool = HackerNewsTool()
+    result = await tool.execute(limit=3)
+    print(f"Result: {result}")
 
+if __name__ == "__main__":
     import asyncio
     asyncio.run(main()) 
