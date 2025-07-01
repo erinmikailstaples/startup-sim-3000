@@ -107,11 +107,12 @@ async def test_galileo_logging():
     
     print(f"\n🎉 Galileo logging test completed!")
     print(f"📊 Check your Galileo dashboard for:")
-    print(f"   - Individual tool spans (hackernews_tool, news_api_tool, startup_simulator, serious_startup_simulator)")
-    print(f"   - Agent workflow spans")
-    print(f"   - Result formatting spans")
-    print(f"   - Proper context passing between tools")
-    print(f"   - Error handling and trace conclusions")
+    print(f"   - Main agent workflow span (agent_workflow_silly/agent_workflow_serious)")
+    print(f"   - Child tool spans (hackernews_tool, news_api_tool, startup_simulator, serious_startup_simulator)")
+    print(f"   - Result formatting span (format_result)")
+    print(f"   - Proper span hierarchy with parent-child relationships")
+    print(f"   - Detailed metadata for each span")
+    print(f"   - Error handling and span completion")
 
 async def test_individual_tools():
     """Test individual tools to verify their Galileo logging"""
@@ -182,4 +183,9 @@ if __name__ == "__main__":
     asyncio.run(test_galileo_logging())
     
     print(f"\n🎉 All tests completed!")
-    print(f"📊 Check your Galileo dashboard for detailed traces and spans.") 
+    print(f"📊 Check your Galileo dashboard for detailed traces and spans.")
+    print(f"🔍 Look for:")
+    print(f"   - Single agent workflow span per execution")
+    print(f"   - Child spans for each tool execution")
+    print(f"   - Proper span hierarchy and relationships")
+    print(f"   - Rich metadata on each span") 

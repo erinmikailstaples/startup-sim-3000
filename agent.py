@@ -136,7 +136,7 @@ class SimpleAgent(Agent):
             implementation=NewsAPITool
         )
 
-    async def _format_result(self, task: str, results: List[tuple[str, Any]]) -> str:
+    async def _format_result(self, task: str, results: List[tuple[str, Any]], galileo_logger: GalileoLogger) -> str:
         """
         Format the final result from tool executions.
         
@@ -147,31 +147,24 @@ class SimpleAgent(Agent):
         Args:
             task: The original user request
             results: List of (tool_name, result) tuples from executed tools
+            galileo_logger: Galileo logger instance for span creation
             
         Returns:
             Formatted string response for the user
         """
-        # Initialize Galileo logger for this operation
-        galileo_logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
+        
+        # Add LLM span for result formatting
+        galileo_logger.add_llm_span(
+            input=f"Formatting results for task: {task}",
+            output="Formatting started",
+            model="result_formatter",
+            num_input_tokens=len(str(results)),
+            num_output_tokens=0,
+            total_tokens=len(str(results)),
+            duration_ns=0
         )
         
-        # Start trace for result formatting
-        trace = galileo_logger.start_trace("format_result")
-        
         try:
-            # Add span for formatting start
-            galileo_logger.add_llm_span(
-                input=f"Formatting results for task: {task}",
-                output="Formatting started",
-                model="result_formatter",
-                num_input_tokens=len(str(results)),
-                num_output_tokens=0,
-                total_tokens=len(str(results)),
-                duration_ns=0
-            )
-            
             # Check for silly mode first - look for startup_simulator tool results
             for tool_name, result in results:
                 if tool_name == "startup_simulator":
@@ -181,7 +174,7 @@ class SimpleAgent(Agent):
                             parsed_result = json.loads(result)
                             pitch = parsed_result.get("pitch", "")
                         else:
-                            # Fallback for dict format (shouldn't happen now)
+                            # Fallback for dict format
                             pitch = result.get("pitch", "")
                         
                         # Log full structured result to Galileo for observability
@@ -193,7 +186,7 @@ class SimpleAgent(Agent):
                         }
                         print(f"Agent Result Data (Silly): {json.dumps(result_data, indent=2)}")
                         
-                        # Add span for formatting completion
+                        # Add LLM span for formatting completion
                         galileo_logger.add_llm_span(
                             input=f"Result formatting completed for {tool_name}",
                             output=pitch,
@@ -204,25 +197,29 @@ class SimpleAgent(Agent):
                             duration_ns=0
                         )
                         
-                        # Conclude the trace successfully
-                        galileo_logger.conclude(output=pitch, duration_ns=0)
-                        
                         return pitch
+                        
                     except json.JSONDecodeError as e:
-                        print(f"Error parsing silly mode result: {e}")
-                        galileo_logger.conclude(output=str(result), duration_ns=0, error=True)
+                        print(f"Error parsing startup simulator result: {e}")
+                        galileo_logger.add_llm_span(
+                            input=f"Error parsing result for {tool_name}",
+                            output=str(e),
+                            model="result_formatter",
+                            num_input_tokens=len(str(result)),
+                            num_output_tokens=len(str(e)),
+                            total_tokens=len(str(result)) + len(str(e)),
+                            duration_ns=0
+                        )
                         return str(result)
-            
-            # Check for serious mode - look for serious_startup_simulator tool results
-            for tool_name, result in results:
-                if tool_name == "serious_startup_simulator":
+                
+                elif tool_name == "serious_startup_simulator":
                     # Parse the JSON string result from Galileo-formatted output
                     try:
                         if isinstance(result, str):
                             parsed_result = json.loads(result)
                             pitch = parsed_result.get("pitch", "")
                         else:
-                            # Fallback for dict format (shouldn't happen now)
+                            # Fallback for dict format
                             pitch = result.get("pitch", "")
                         
                         # Log full structured result to Galileo for observability
@@ -234,7 +231,7 @@ class SimpleAgent(Agent):
                         }
                         print(f"Agent Result Data (Serious): {json.dumps(result_data, indent=2)}")
                         
-                        # Add span for formatting completion
+                        # Add LLM span for formatting completion
                         galileo_logger.add_llm_span(
                             input=f"Result formatting completed for {tool_name}",
                             output=pitch,
@@ -245,37 +242,63 @@ class SimpleAgent(Agent):
                             duration_ns=0
                         )
                         
-                        # Conclude the trace successfully
-                        galileo_logger.conclude(output=pitch, duration_ns=0)
-                        
                         return pitch
+                        
                     except json.JSONDecodeError as e:
-                        print(f"Error parsing serious mode result: {e}")
-                        galileo_logger.conclude(output=str(result), duration_ns=0, error=True)
+                        print(f"Error parsing serious startup simulator result: {e}")
+                        galileo_logger.add_llm_span(
+                            input=f"Error parsing result for {tool_name}",
+                            output=str(e),
+                            model="result_formatter",
+                            num_input_tokens=len(str(result)),
+                            num_output_tokens=len(str(e)),
+                            total_tokens=len(str(result)) + len(str(e)),
+                            duration_ns=0
+                        )
                         return str(result)
             
-            # No valid result found
-            galileo_logger.conclude(output="No startup pitch generated.", duration_ns=0)
-            return "No startup pitch generated."
+            # If no startup simulator results found, return a summary
+            summary = f"Generated results for {len(results)} tools: {[r[0] for r in results]}"
+            galileo_logger.add_llm_span(
+                input=f"No startup simulator results found",
+                output=summary,
+                model="result_formatter",
+                num_input_tokens=len(str(results)),
+                num_output_tokens=len(summary),
+                total_tokens=len(str(results)) + len(summary),
+                duration_ns=0
+            )
+            return summary
             
         except Exception as e:
-            # Conclude the trace with error
-            galileo_logger.conclude(output=str(e), duration_ns=0, error=True)
+            galileo_logger.add_llm_span(
+                input=f"Error in result formatting",
+                output=str(e),
+                model="result_formatter",
+                num_input_tokens=len(str(results)),
+                num_output_tokens=len(str(e)),
+                total_tokens=len(str(results)) + len(str(e)),
+                duration_ns=0
+            )
             raise e
 
-    async def _execute_hackernews_tool(self, limit: int = 3) -> str:
-        """Execute HackerNews tool with proper Galileo logging"""
-        # Initialize Galileo logger for this tool execution
-        galileo_logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+    async def _execute_hackernews_tool(self, limit: int = 3, galileo_logger: GalileoLogger = None) -> str:
+        """
+        Execute the HackerNews tool to get trending stories for context.
         
-        # Start trace for HackerNews tool
-        trace = galileo_logger.start_trace(f"execute_hackernews_tool")
+        This tool fetches recent HackerNews stories to provide creative inspiration
+        for the startup pitch generation. It's used in "silly" mode.
         
-        try:
-            # Add span for tool execution start
+        Args:
+            limit: Number of stories to fetch
+            galileo_logger: Galileo logger instance for span creation
+            
+        Returns:
+            JSON string with HackerNews context
+        """
+        
+        if galileo_logger:
+            # Add LLM span for tool execution start
             galileo_logger.add_llm_span(
                 input=f"Executing HackerNews tool with limit: {limit}",
                 output="Tool execution started",
@@ -285,50 +308,71 @@ class SimpleAgent(Agent):
                 total_tokens=len(str(limit)),
                 duration_ns=0
             )
-            
-            hn_tool_class = self.tool_registry.get_implementation("hackernews_tool")
-            if hn_tool_class:
-                hn_tool = hn_tool_class()
-                hn_context = await hn_tool.execute(limit=limit)
+        
+        try:
+            startup_tool_class = self.tool_registry.get_implementation("hackernews_tool")
+            if startup_tool_class:
+                startup_tool = startup_tool_class()
+                startup_result = await startup_tool.execute(limit=limit)
                 
-                # Add span for tool completion
-                galileo_logger.add_llm_span(
-                    input=f"HackerNews tool execution completed",
-                    output=hn_context[:200] + "..." if len(hn_context) > 200 else hn_context,
-                    model="hackernews_tool",
-                    num_input_tokens=len(str(limit)),
-                    num_output_tokens=len(hn_context),
-                    total_tokens=len(str(limit)) + len(hn_context),
-                    duration_ns=0
-                )
+                # Add LLM span for tool completion
+                if galileo_logger:
+                    galileo_logger.add_llm_span(
+                        input=f"HackerNews tool execution completed",
+                        output=startup_result[:200] + "..." if len(startup_result) > 200 else startup_result,
+                        model="hackernews_tool",
+                        num_input_tokens=len(str(limit)),
+                        num_output_tokens=len(startup_result),
+                        total_tokens=len(str(limit)) + len(startup_result),
+                        duration_ns=0
+                    )
                 
-                # Conclude the trace successfully
-                galileo_logger.conclude(output=hn_context, duration_ns=0)
-                
-                return hn_context
+                return startup_result
             
             # Tool not found
-            galileo_logger.conclude(output="", duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"HackerNews tool not found",
+                    output="",
+                    model="hackernews_tool",
+                    num_input_tokens=len(str(limit)),
+                    num_output_tokens=0,
+                    total_tokens=len(str(limit)),
+                    duration_ns=0
+                )
             return ""
             
         except Exception as e:
-            # Conclude the trace with error
-            galileo_logger.conclude(output=str(e), duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"Error in HackerNews tool execution",
+                    output=str(e),
+                    model="hackernews_tool",
+                    num_input_tokens=len(str(limit)),
+                    num_output_tokens=len(str(e)),
+                    total_tokens=len(str(limit)) + len(str(e)),
+                    duration_ns=0
+                )
             raise e
 
-    async def _execute_news_api_tool(self, category: str = "business", limit: int = 5) -> str:
-        """Execute News API tool with proper Galileo logging"""
-        # Initialize Galileo logger for this tool execution
-        galileo_logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+    async def _execute_news_api_tool(self, category: str = "business", limit: int = 5, galileo_logger: GalileoLogger = None) -> str:
+        """
+        Execute the NewsAPI tool to get business news for context.
         
-        # Start trace for News API tool
-        trace = galileo_logger.start_trace(f"execute_news_api_tool")
+        This tool fetches recent business news articles to provide market analysis
+        and professional context for the startup plan generation. It's used in "serious" mode.
         
-        try:
-            # Add span for tool execution start
+        Args:
+            category: News category to fetch
+            limit: Number of articles to fetch
+            galileo_logger: Galileo logger instance for span creation
+            
+        Returns:
+            JSON string with business news context
+        """
+        
+        if galileo_logger:
+            # Add LLM span for tool execution start
             galileo_logger.add_llm_span(
                 input=f"Executing News API tool with category: {category}, limit: {limit}",
                 output="Tool execution started",
@@ -338,50 +382,73 @@ class SimpleAgent(Agent):
                 total_tokens=len(str(category)) + len(str(limit)),
                 duration_ns=0
             )
-            
-            news_tool_class = self.tool_registry.get_implementation("news_api_tool")
-            if news_tool_class:
-                news_tool = news_tool_class()
-                news_context = await news_tool.execute(category=category, limit=limit)
+        
+        try:
+            startup_tool_class = self.tool_registry.get_implementation("news_api_tool")
+            if startup_tool_class:
+                startup_tool = startup_tool_class()
+                startup_result = await startup_tool.execute(category=category, limit=limit)
                 
-                # Add span for tool completion
-                galileo_logger.add_llm_span(
-                    input=f"News API tool execution completed",
-                    output=news_context[:200] + "..." if len(news_context) > 200 else news_context,
-                    model="news_api_tool",
-                    num_input_tokens=len(str(category)) + len(str(limit)),
-                    num_output_tokens=len(news_context),
-                    total_tokens=len(str(category)) + len(str(limit)) + len(news_context),
-                    duration_ns=0
-                )
+                # Add LLM span for tool completion
+                if galileo_logger:
+                    galileo_logger.add_llm_span(
+                        input=f"News API tool execution completed",
+                        output=startup_result[:200] + "..." if len(startup_result) > 200 else startup_result,
+                        model="news_api_tool",
+                        num_input_tokens=len(str(category)) + len(str(limit)),
+                        num_output_tokens=len(startup_result),
+                        total_tokens=len(str(category)) + len(str(limit)) + len(startup_result),
+                        duration_ns=0
+                    )
                 
-                # Conclude the trace successfully
-                galileo_logger.conclude(output=news_context, duration_ns=0)
-                
-                return news_context
+                return startup_result
             
             # Tool not found
-            galileo_logger.conclude(output="", duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"News API tool not found",
+                    output="",
+                    model="news_api_tool",
+                    num_input_tokens=len(str(category)) + len(str(limit)),
+                    num_output_tokens=0,
+                    total_tokens=len(str(category)) + len(str(limit)),
+                    duration_ns=0
+                )
             return ""
             
         except Exception as e:
-            # Conclude the trace with error
-            galileo_logger.conclude(output=str(e), duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"Error in News API tool execution",
+                    output=str(e),
+                    model="news_api_tool",
+                    num_input_tokens=len(str(category)) + len(str(limit)),
+                    num_output_tokens=len(str(e)),
+                    total_tokens=len(str(category)) + len(str(limit)) + len(str(e)),
+                    duration_ns=0
+                )
             raise e
 
-    async def _execute_startup_simulator(self, industry: str, audience: str, random_word: str, hn_context: str = "") -> str:
-        """Execute startup simulator tool with proper Galileo logging"""
-        # Initialize Galileo logger for this tool execution
-        galileo_logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+    async def _execute_startup_simulator(self, industry: str, audience: str, random_word: str, hn_context: str = "", galileo_logger: GalileoLogger = None) -> str:
+        """
+        Execute the startup simulator tool for silly mode.
         
-        # Start trace for startup simulator tool
-        trace = galileo_logger.start_trace(f"execute_startup_simulator")
+        This tool generates creative, humorous startup pitches using HackerNews
+        context for inspiration. It's the main tool used in "silly" mode.
         
-        try:
-            # Add span for tool execution start
+        Args:
+            industry: Target industry for the startup
+            audience: Target audience for the startup
+            random_word: Random word to include in the pitch
+            hn_context: HackerNews context for inspiration
+            galileo_logger: Galileo logger instance for span creation
+            
+        Returns:
+            JSON string with generated startup pitch
+        """
+        
+        if galileo_logger:
+            # Add LLM span for tool execution start
             galileo_logger.add_llm_span(
                 input=f"Executing startup simulator for {industry} targeting {audience} with word '{random_word}'",
                 output="Tool execution started",
@@ -391,7 +458,8 @@ class SimpleAgent(Agent):
                 total_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context),
                 duration_ns=0
             )
-            
+        
+        try:
             startup_tool_class = self.tool_registry.get_implementation("startup_simulator")
             if startup_tool_class:
                 startup_tool = startup_tool_class()
@@ -402,44 +470,66 @@ class SimpleAgent(Agent):
                     hn_context=hn_context
                 )
                 
-                # Add span for tool completion
-                galileo_logger.add_llm_span(
-                    input=f"Startup simulator execution completed",
-                    output=startup_result[:200] + "..." if len(startup_result) > 200 else startup_result,
-                    model="startup_simulator",
-                    num_input_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context),
-                    num_output_tokens=len(startup_result),
-                    total_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context) + len(startup_result),
-                    duration_ns=0
-                )
-                
-                # Conclude the trace successfully
-                galileo_logger.conclude(output=startup_result, duration_ns=0)
+                # Add LLM span for tool completion
+                if galileo_logger:
+                    galileo_logger.add_llm_span(
+                        input=f"Startup simulator execution completed",
+                        output=startup_result[:200] + "..." if len(startup_result) > 200 else startup_result,
+                        model="startup_simulator",
+                        num_input_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context),
+                        num_output_tokens=len(startup_result),
+                        total_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context) + len(startup_result),
+                        duration_ns=0
+                    )
                 
                 return startup_result
             
             # Tool not found
-            galileo_logger.conclude(output="", duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"Startup simulator tool not found",
+                    output="",
+                    model="startup_simulator",
+                    num_input_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context),
+                    num_output_tokens=0,
+                    total_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context),
+                    duration_ns=0
+                )
             return ""
             
         except Exception as e:
-            # Conclude the trace with error
-            galileo_logger.conclude(output=str(e), duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"Error in startup simulator execution",
+                    output=str(e),
+                    model="startup_simulator",
+                    num_input_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context),
+                    num_output_tokens=len(str(e)),
+                    total_tokens=len(industry) + len(audience) + len(random_word) + len(hn_context) + len(str(e)),
+                    duration_ns=0
+                )
             raise e
 
-    async def _execute_serious_startup_simulator(self, industry: str, audience: str, random_word: str, news_context: str = "") -> str:
-        """Execute serious startup simulator tool with proper Galileo logging"""
-        # Initialize Galileo logger for this tool execution
-        galileo_logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+    async def _execute_serious_startup_simulator(self, industry: str, audience: str, random_word: str, news_context: str = "", galileo_logger: GalileoLogger = None) -> str:
+        """
+        Execute the serious startup simulator tool for professional mode.
         
-        # Start trace for serious startup simulator tool
-        trace = galileo_logger.start_trace(f"execute_serious_startup_simulator")
+        This tool generates professional, business-focused startup plans using
+        business news context for market analysis. It's the main tool used in "serious" mode.
         
-        try:
-            # Add span for tool execution start
+        Args:
+            industry: Target industry for the startup
+            audience: Target audience for the startup
+            random_word: Random word to include in the plan
+            news_context: Business news context for market analysis
+            galileo_logger: Galileo logger instance for span creation
+            
+        Returns:
+            JSON string with generated startup plan
+        """
+        
+        if galileo_logger:
+            # Add LLM span for tool execution start
             galileo_logger.add_llm_span(
                 input=f"Executing serious startup simulator for {industry} targeting {audience} with word '{random_word}'",
                 output="Tool execution started",
@@ -449,7 +539,8 @@ class SimpleAgent(Agent):
                 total_tokens=len(industry) + len(audience) + len(random_word) + len(news_context),
                 duration_ns=0
             )
-            
+        
+        try:
             startup_tool_class = self.tool_registry.get_implementation("serious_startup_simulator")
             if startup_tool_class:
                 startup_tool = startup_tool_class()
@@ -460,29 +551,44 @@ class SimpleAgent(Agent):
                     news_context=news_context
                 )
                 
-                # Add span for tool completion
-                galileo_logger.add_llm_span(
-                    input=f"Serious startup simulator execution completed",
-                    output=startup_result[:200] + "..." if len(startup_result) > 200 else startup_result,
-                    model="serious_startup_simulator",
-                    num_input_tokens=len(industry) + len(audience) + len(random_word) + len(news_context),
-                    num_output_tokens=len(startup_result),
-                    total_tokens=len(industry) + len(audience) + len(random_word) + len(news_context) + len(startup_result),
-                    duration_ns=0
-                )
-                
-                # Conclude the trace successfully
-                galileo_logger.conclude(output=startup_result, duration_ns=0)
+                # Add LLM span for tool completion
+                if galileo_logger:
+                    galileo_logger.add_llm_span(
+                        input=f"Serious startup simulator execution completed",
+                        output=startup_result[:200] + "..." if len(startup_result) > 200 else startup_result,
+                        model="serious_startup_simulator",
+                        num_input_tokens=len(industry) + len(audience) + len(random_word) + len(news_context),
+                        num_output_tokens=len(startup_result),
+                        total_tokens=len(industry) + len(audience) + len(random_word) + len(news_context) + len(startup_result),
+                        duration_ns=0
+                    )
                 
                 return startup_result
             
             # Tool not found
-            galileo_logger.conclude(output="", duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"Serious startup simulator tool not found",
+                    output="",
+                    model="serious_startup_simulator",
+                    num_input_tokens=len(industry) + len(audience) + len(random_word) + len(news_context),
+                    num_output_tokens=0,
+                    total_tokens=len(industry) + len(audience) + len(random_word) + len(news_context),
+                    duration_ns=0
+                )
             return ""
             
         except Exception as e:
-            # Conclude the trace with error
-            galileo_logger.conclude(output=str(e), duration_ns=0, error=True)
+            if galileo_logger:
+                galileo_logger.add_llm_span(
+                    input=f"Error in serious startup simulator execution",
+                    output=str(e),
+                    model="serious_startup_simulator",
+                    num_input_tokens=len(industry) + len(audience) + len(random_word) + len(news_context),
+                    num_output_tokens=len(str(e)),
+                    total_tokens=len(industry) + len(audience) + len(random_word) + len(news_context) + len(str(e)),
+                    duration_ns=0
+                )
             raise e
 
     async def run(self, task: str, industry: str = "", audience: str = "", random_word: str = "") -> str:
@@ -525,17 +631,17 @@ class SimpleAgent(Agent):
         print(f"Agent Workflow Start: {json.dumps(workflow_data, indent=2)}")
         
         # Initialize Galileo logger for this agent execution
-        logger = GalileoLogger(
+        galileo_logger = GalileoLogger(
             project=os.environ.get("GALILEO_PROJECT"),
             log_stream=os.environ.get("GALILEO_LOG_STREAM")
         )
         
-        # Start individual trace for this agent workflow
-        trace = logger.start_trace(f"Agent Workflow - {self.mode} mode - {self.agent_id}")
+        # Start the main agent trace - this is the parent trace for the entire workflow
+        trace = galileo_logger.start_trace(f"agent_workflow_{self.mode}")
         
         try:
             # Add LLM span for workflow start
-            logger.add_llm_span(
+            galileo_logger.add_llm_span(
                 input=f"Agent workflow started for task: {task}",
                 output="Workflow initialization",
                 model="agent_workflow",
@@ -551,7 +657,11 @@ class SimpleAgent(Agent):
             if self.mode == "serious":
                 # Step 1: Get news context first
                 print("🔍 Step 1: Fetching business news for context...")
-                news_context = await self._execute_news_api_tool(category="business", limit=5)
+                news_context = await self._execute_news_api_tool(
+                    category="business", 
+                    limit=5, 
+                    galileo_logger=galileo_logger
+                )
                 results.append(("news_api", news_context))
                 
                 # Step 2: Generate serious startup pitch using the news context
@@ -560,14 +670,18 @@ class SimpleAgent(Agent):
                     industry=industry,
                     audience=audience,
                     random_word=random_word,
-                    news_context=news_context
+                    news_context=news_context,
+                    galileo_logger=galileo_logger
                 )
                 results.append(("serious_startup_simulator", startup_result))
             
             else:  # silly mode
                 # Step 1: Get HackerNews context first
                 print("🔍 Step 1: Fetching HackerNews stories for inspiration...")
-                hn_context = await self._execute_hackernews_tool(limit=3)
+                hn_context = await self._execute_hackernews_tool(
+                    limit=3, 
+                    galileo_logger=galileo_logger
+                )
                 results.append(("hackernews", hn_context))
                 
                 # Step 2: Generate silly startup pitch using the HN context
@@ -576,13 +690,14 @@ class SimpleAgent(Agent):
                     industry=industry,
                     audience=audience,
                     random_word=random_word,
-                    hn_context=hn_context
+                    hn_context=hn_context,
+                    galileo_logger=galileo_logger
                 )
                 results.append(("startup_simulator", startup_result))
             
             # Step 3: Format the final result
             print("✨ Step 3: Formatting final result...")
-            formatted_result = await self._format_result(task, results)
+            formatted_result = await self._format_result(task, results, galileo_logger)
             
             # Log workflow completion as JSON
             completion_data = {
@@ -597,7 +712,7 @@ class SimpleAgent(Agent):
             print(f"Agent Workflow Complete: {json.dumps(completion_data, indent=2)}")
             
             # Add LLM span for workflow completion
-            logger.add_llm_span(
+            galileo_logger.add_llm_span(
                 input=f"Agent workflow completed successfully",
                 output=formatted_result,
                 model="agent_workflow",
@@ -606,9 +721,6 @@ class SimpleAgent(Agent):
                 total_tokens=len(task) + len(formatted_result),
                 duration_ns=0
             )
-            
-            # Conclude the trace successfully
-            logger.conclude(output=formatted_result, duration_ns=0)
             
             # Prepare structured JSON output for Galileo workflow logging
             workflow_result = {
@@ -625,12 +737,26 @@ class SimpleAgent(Agent):
             if self.logger:
                 await self.logger.on_agent_done(formatted_result, self.message_history)
             
+            # Conclude the trace successfully
+            galileo_logger.conclude(output=formatted_result, duration_ns=0)
+            
             # Return structured JSON string for Galileo workflow logging
             return json.dumps(workflow_result, indent=2)
             
         except Exception as e:
+            # Add LLM span for workflow error
+            galileo_logger.add_llm_span(
+                input=f"Agent workflow error",
+                output=str(e),
+                model="agent_workflow",
+                num_input_tokens=len(task),
+                num_output_tokens=len(str(e)),
+                total_tokens=len(task) + len(str(e)),
+                duration_ns=0
+            )
+            
             # Conclude the trace with error
-            logger.conclude(output=str(e), duration_ns=0, error=True)
+            galileo_logger.conclude(output=str(e), duration_ns=0, error=True)
             
             raise e
         finally:
