@@ -1,7 +1,7 @@
 import os
 import json
 import aiohttp
-from galileo import log
+from galileo import GalileoLogger
 from typing import Dict, Any, List
 from agent_framework.tools.base import BaseTool
 from agent_framework.models import ToolMetadata
@@ -18,8 +18,7 @@ class NewsAPITool(BaseTool):
     def __init__(self):
         super().__init__()
         self.name = "news_api_tool"
-        self.description = "Fetch business news articles for market analysis and professional context"
-        self.api_key = os.environ.get("NEWS_API_KEY")
+        self.description = "Fetch business news from NewsAPI for market analysis"
         # Get the centralized Galileo logger
         self.galileo_logger = get_galileo_logger()
 
@@ -27,7 +26,7 @@ class NewsAPITool(BaseTool):
     def get_metadata(cls) -> ToolMetadata:
         return ToolMetadata(
             name="news_api_tool",
-            description="Fetches business news articles for market analysis and professional context",
+            description="Fetches business news from NewsAPI for market analysis and professional context",
             tags=["news", "business", "market", "analysis"],
             input_schema={
                 "type": "object",
@@ -51,9 +50,8 @@ class NewsAPITool(BaseTool):
             }
         )
 
-    @log(span_type="tool", name="news_api_tool")
     async def execute(self, category: str = "business", limit: int = 5) -> str:
-        """Fetch business news articles"""
+        """Fetch business news from NewsAPI"""
         
         # Log inputs
         inputs = {
@@ -70,7 +68,7 @@ class NewsAPITool(BaseTool):
             return await self._execute_without_galileo(category, limit)
         
         # Start individual trace for this tool
-        trace = logger.start_trace(f"News API Tool - Fetching {limit} {category} articles")
+        trace = logger.start_trace(f"News API Tool - Fetching {category} news")
         
         try:
             # Add span for tool execution start
@@ -84,15 +82,17 @@ class NewsAPITool(BaseTool):
                 duration_ns=0
             )
             
-            if not self.api_key:
+            # Get API key from environment
+            api_key = os.environ.get("NEWS_API_KEY")
+            if not api_key:
                 raise Exception("NEWS_API_KEY not found in environment variables")
             
-            # Fetch news articles
+            # Fetch news from NewsAPI
             url = f"https://newsapi.org/v2/top-headlines"
             params = {
                 "country": "us",
                 "category": category,
-                "apiKey": self.api_key,
+                "apiKey": api_key,
                 "pageSize": limit
             }
             
@@ -102,22 +102,27 @@ class NewsAPITool(BaseTool):
                         raise Exception(f"Failed to fetch news: {response.status}")
                     
                     data = await response.json()
+                    
+                    if data.get("status") != "ok":
+                        raise Exception(f"NewsAPI error: {data.get('message', 'Unknown error')}")
+                    
                     articles = data.get("articles", [])
-            
-            # Format articles for context
-            formatted_articles = []
-            for article in articles:
-                title = article.get("title", "No title")
-                description = article.get("description", "No description")
-                formatted_articles.append(f"• {title}: {description}")
-            
-            context = "\n".join(formatted_articles)
+                    
+                    # Format articles for context
+                    formatted_articles = []
+                    for article in articles[:limit]:
+                        title = article.get("title", "No title")
+                        description = article.get("description", "No description")
+                        source = article.get("source", {}).get("name", "Unknown source")
+                        formatted_articles.append(f"• {title} ({source}) - {description}")
+                    
+                    context = "\n".join(formatted_articles)
             
             # Create structured output
             output = {
-                "articles": articles,
+                "articles": articles[:limit],
                 "formatted_context": context,
-                "article_count": len(articles),
+                "article_count": len(articles[:limit]),
                 "requested_limit": limit,
                 "category": category,
                 "timestamp": datetime.now().isoformat(),
@@ -171,15 +176,17 @@ class NewsAPITool(BaseTool):
 
     async def _execute_without_galileo(self, category: str = "business", limit: int = 5) -> str:
         """Fallback execution without Galileo logging"""
-        if not self.api_key:
+        # Get API key from environment
+        api_key = os.environ.get("NEWS_API_KEY")
+        if not api_key:
             raise Exception("NEWS_API_KEY not found in environment variables")
         
-        # Fetch news articles
+        # Fetch news from NewsAPI
         url = f"https://newsapi.org/v2/top-headlines"
         params = {
             "country": "us",
             "category": category,
-            "apiKey": self.api_key,
+            "apiKey": api_key,
             "pageSize": limit
         }
         
@@ -189,22 +196,27 @@ class NewsAPITool(BaseTool):
                     raise Exception(f"Failed to fetch news: {response.status}")
                 
                 data = await response.json()
+                
+                if data.get("status") != "ok":
+                    raise Exception(f"NewsAPI error: {data.get('message', 'Unknown error')}")
+                
                 articles = data.get("articles", [])
-        
-        # Format articles for context
-        formatted_articles = []
-        for article in articles:
-            title = article.get("title", "No title")
-            description = article.get("description", "No description")
-            formatted_articles.append(f"• {title}: {description}")
-        
-        context = "\n".join(formatted_articles)
+                
+                # Format articles for context
+                formatted_articles = []
+                for article in articles[:limit]:
+                    title = article.get("title", "No title")
+                    description = article.get("description", "No description")
+                    source = article.get("source", {}).get("name", "Unknown source")
+                    formatted_articles.append(f"• {title} ({source}) - {description}")
+                
+                context = "\n".join(formatted_articles)
         
         # Create structured output
         output = {
-            "articles": articles,
+            "articles": articles[:limit],
             "formatted_context": context,
-            "article_count": len(articles),
+            "article_count": len(articles[:limit]),
             "requested_limit": limit,
             "category": category,
             "timestamp": datetime.now().isoformat(),

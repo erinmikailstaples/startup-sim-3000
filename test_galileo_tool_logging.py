@@ -1,143 +1,185 @@
 #!/usr/bin/env python3
 """
-Test script to verify Galileo tool logging with individual spans.
-This script tests both silly and serious modes to ensure each tool is properly logged.
+Test script to verify Galileo logging for all tools and agent workflow.
+This script tests both silly and serious modes to ensure proper span logging.
 """
 
 import asyncio
+import os
 import json
 from dotenv import load_dotenv
 from agent import SimpleAgent
+from agent_framework.llm.openai_provider import OpenAIProvider
+from agent_framework.llm.models import LLMConfig
+from agent_framework.utils.logging import ConsoleAgentLogger
 
 # Load environment variables
 load_dotenv()
 
-async def test_silly_mode():
-    """Test silly mode with proper tool logging"""
-    print("🎭 Testing Silly Mode with Galileo Tool Logging")
+async def test_galileo_logging():
+    """Test Galileo logging for all tools and agent workflow"""
+    
+    print("🧪 Testing Galileo Logging for Agent Workflow")
     print("=" * 60)
     
-    # Create agent in silly mode
-    agent = SimpleAgent(mode="silly")
+    # Verify environment variables
+    required_vars = ["OPENAI_API_KEY", "GALILEO_API_KEY", "GALILEO_PROJECT", "GALILEO_LOG_STREAM"]
+    missing_vars = [var for var in required_vars if not os.environ.get(var)]
     
-    # Test parameters
-    task = "Generate a creative startup pitch"
-    industry = "tech"
-    audience = "millennials"
-    random_word = "pizza"
+    if missing_vars:
+        print(f"❌ Missing required environment variables: {missing_vars}")
+        return
     
-    print(f"Task: {task}")
-    print(f"Industry: {industry}")
-    print(f"Audience: {audience}")
-    print(f"Random Word: {random_word}")
-    print()
+    print("✅ Environment variables verified")
     
-    try:
-        # Execute the agent
-        result = await agent.run(task, industry, audience, random_word)
+    # Test both modes
+    modes = ["silly", "serious"]
+    
+    for mode in modes:
+        print(f"\n🎯 Testing {mode.upper()} MODE")
+        print("-" * 40)
         
-        # Parse the result
-        if isinstance(result, str):
+        try:
+            # Create LLM provider
+            llm_config = LLMConfig(
+                model="gpt-4",
+                temperature=0.7,
+                max_tokens=1000
+            )
+            llm_provider = OpenAIProvider(config=llm_config)
+            
+            # Create agent with logger
+            logger = ConsoleAgentLogger(f"test-agent-{mode}")
+            agent = SimpleAgent(
+                verbosity="low",
+                logger=logger,
+                llm_provider=llm_provider,
+                mode=mode
+            )
+            
+            # Test parameters
+            test_params = {
+                "task": f"Generate a {mode} startup pitch",
+                "industry": "Technology",
+                "audience": "Young professionals",
+                "random_word": "innovation"
+            }
+            
+            print(f"📝 Executing agent with parameters: {json.dumps(test_params, indent=2)}")
+            
+            # Execute the agent
+            result = await agent.run(**test_params)
+            
+            # Parse the result
             try:
                 parsed_result = json.loads(result)
-                final_output = parsed_result.get("final_output", result)
-            except json.JSONDecodeError:
-                final_output = result
-        else:
-            final_output = result
-        
-        print("✅ Silly Mode Test Completed Successfully!")
-        print(f"Final Output: {final_output}")
-        print()
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Silly Mode Test Failed: {e}")
-        return False
+                print(f"✅ Agent execution completed successfully")
+                print(f"📊 Result summary:")
+                print(f"   - Mode: {parsed_result.get('mode', 'unknown')}")
+                print(f"   - Tools used: {parsed_result.get('tools_used', [])}")
+                print(f"   - Execution status: {parsed_result.get('execution_status', 'unknown')}")
+                print(f"   - Output length: {len(parsed_result.get('final_output', ''))} characters")
+                
+                # Extract the actual pitch from the nested structure
+                final_output = parsed_result.get('final_output', '')
+                if isinstance(final_output, str):
+                    try:
+                        # Try to parse the final output as JSON to get the pitch
+                        output_data = json.loads(final_output)
+                        if 'pitch' in output_data:
+                            pitch = output_data['pitch']
+                            print(f"🎭 Generated pitch: {pitch[:100]}...")
+                        else:
+                            print(f"📄 Final output: {final_output[:100]}...")
+                    except json.JSONDecodeError:
+                        print(f"📄 Final output: {final_output[:100]}...")
+                
+            except json.JSONDecodeError as e:
+                print(f"⚠️  Result is not valid JSON: {e}")
+                print(f"📄 Raw result: {result[:200]}...")
+            
+            print(f"✅ {mode.capitalize()} mode test completed successfully")
+            
+        except Exception as e:
+            print(f"❌ Error in {mode} mode test: {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    print(f"\n🎉 Galileo logging test completed!")
+    print(f"📊 Check your Galileo dashboard for:")
+    print(f"   - Individual tool spans (hackernews_tool, news_api_tool, startup_simulator, serious_startup_simulator)")
+    print(f"   - Agent workflow spans")
+    print(f"   - Result formatting spans")
+    print(f"   - Proper context passing between tools")
+    print(f"   - Error handling and trace conclusions")
 
-async def test_serious_mode():
-    """Test serious mode with proper tool logging"""
-    print("📊 Testing Serious Mode with Galileo Tool Logging")
-    print("=" * 60)
+async def test_individual_tools():
+    """Test individual tools to verify their Galileo logging"""
     
-    # Create agent in serious mode
-    agent = SimpleAgent(mode="serious")
+    print(f"\n🔧 Testing Individual Tools")
+    print("=" * 40)
     
-    # Test parameters
-    task = "Generate a professional startup business plan"
-    industry = "fintech"
-    audience = "enterprise"
-    random_word = "blockchain"
+    # Import tools
+    from tools.hackernews_tool import HackerNewsTool
+    from tools.news_api_tool import NewsAPITool
+    from tools.startup_simulator import StartupSimulatorTool
+    from tools.serious_startup_simulator import SeriousStartupSimulatorTool
     
-    print(f"Task: {task}")
-    print(f"Industry: {industry}")
-    print(f"Audience: {audience}")
-    print(f"Random Word: {random_word}")
-    print()
+    tools_to_test = [
+        ("HackerNews Tool", HackerNewsTool(), {"limit": 2}),
+        ("News API Tool", NewsAPITool(), {"category": "business", "limit": 2}),
+        ("Startup Simulator", StartupSimulatorTool(), {
+            "industry": "Tech", 
+            "audience": "Developers", 
+            "random_word": "blockchain",
+            "hn_context": "Sample HN context for testing"
+        }),
+        ("Serious Startup Simulator", SeriousStartupSimulatorTool(), {
+            "industry": "Finance", 
+            "audience": "Investors", 
+            "random_word": "fintech",
+            "news_context": "Sample news context for testing"
+        })
+    ]
     
-    try:
-        # Execute the agent
-        result = await agent.run(task, industry, audience, random_word)
+    for tool_name, tool, params in tools_to_test:
+        print(f"\n🔧 Testing {tool_name}")
+        print("-" * 30)
         
-        # Parse the result
-        if isinstance(result, str):
+        try:
+            print(f"📝 Executing with parameters: {json.dumps(params, indent=2)}")
+            
+            # Execute the tool
+            result = await tool.execute(**params)
+            
+            # Parse the result
             try:
                 parsed_result = json.loads(result)
-                final_output = parsed_result.get("final_output", result)
-            except json.JSONDecodeError:
-                final_output = result
-        else:
-            final_output = result
-        
-        print("✅ Serious Mode Test Completed Successfully!")
-        print(f"Final Output: {final_output}")
-        print()
-        
-        return True
-        
-    except Exception as e:
-        print(f"❌ Serious Mode Test Failed: {e}")
-        return False
-
-async def main():
-    """Run all tests"""
-    print("🔍 Galileo Tool Logging Test Suite")
-    print("=" * 60)
-    print("This test verifies that each tool is properly logged as an individual span in Galileo.")
-    print("Check your Galileo dashboard to see the tool spans and traces.")
-    print()
-    
-    # Test silly mode
-    silly_success = await test_silly_mode()
-    
-    print("-" * 60)
-    
-    # Test serious mode
-    serious_success = await test_serious_mode()
-    
-    print("=" * 60)
-    print("📊 Test Results Summary")
-    print("=" * 60)
-    print(f"Silly Mode: {'✅ PASSED' if silly_success else '❌ FAILED'}")
-    print(f"Serious Mode: {'✅ PASSED' if serious_success else '❌ FAILED'}")
-    
-    if silly_success and serious_success:
-        print("\n🎉 All tests passed! Check your Galileo dashboard for:")
-        print("   • Individual tool spans for each tool execution")
-        print("   • Proper trace hierarchy showing tool relationships")
-        print("   • Input/output logging for each tool")
-        print("   • Error handling and fallback mechanisms")
-    else:
-        print("\n⚠️  Some tests failed. Check the error messages above.")
-    
-    print("\n📋 Expected Galileo Spans:")
-    print("   • Agent Workflow (main trace)")
-    print("   • execute_hackernews_tool (silly mode)")
-    print("   • execute_startup_simulator (silly mode)")
-    print("   • execute_news_api_tool (serious mode)")
-    print("   • execute_serious_startup_simulator (serious mode)")
-    print("   • format_result (result formatting)")
+                print(f"✅ {tool_name} executed successfully")
+                print(f"📊 Result type: {parsed_result.get('tool_result', 'unknown')}")
+                
+                # Show a snippet of the output
+                if 'context' in parsed_result:
+                    context = parsed_result['context']
+                    print(f"📄 Context: {context[:100]}...")
+                elif 'pitch' in parsed_result:
+                    pitch = parsed_result['pitch']
+                    print(f"🎭 Pitch: {pitch[:100]}...")
+                
+            except json.JSONDecodeError as e:
+                print(f"⚠️  Result is not valid JSON: {e}")
+                print(f"📄 Raw result: {result[:200]}...")
+            
+        except Exception as e:
+            print(f"❌ Error testing {tool_name}: {str(e)}")
 
 if __name__ == "__main__":
-    asyncio.run(main()) 
+    print("🚀 Starting Galileo Logging Test Suite")
+    print("=" * 60)
+    
+    # Run the tests
+    asyncio.run(test_individual_tools())
+    asyncio.run(test_galileo_logging())
+    
+    print(f"\n🎉 All tests completed!")
+    print(f"📊 Check your Galileo dashboard for detailed traces and spans.") 

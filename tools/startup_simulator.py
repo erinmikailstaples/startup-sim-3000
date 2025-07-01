@@ -1,6 +1,6 @@
 import os
 import json
-from galileo import GalileoLogger, log
+from galileo import GalileoLogger
 from galileo.openai import openai
 from typing import Dict, Any
 from agent_framework.tools.base import BaseTool
@@ -49,7 +49,6 @@ class StartupSimulatorTool(BaseTool):
             }
         )
 
-    @log(span_type="tool", name="startup_simulator")
     async def execute(self, industry: str, audience: str, random_word: str, hn_context: str = "") -> str:
         """Execute the startup simulator tool with individual Galileo trace"""
         
