@@ -1,12 +1,16 @@
+![2025-06-Silly-Startups-Serious-Signals-App-Screenshot](https://github.com/user-attachments/assets/171ddcfc-3514-41c1-897a-88e47b4093df)
+
 # 🚀 Startup Sim 3000
 
 An 8-bit styled AI-powered startup pitch generator that creates either silly, 
 creative pitches or professional business proposals. Built with a custom 
-agentic framework powered by OpenAI and monitored with Galileo observability.
+agentic framework powered by [OpenAI](https://openai.com/) and monitored with [Galileo](https://galileo.ai) Agent Reliability.
 
-This project was built for the **[Databricks Data + AI Summit 2025](https://www.databricks.com/dataaisummit/session/generating-laughter-testing-and-evaluating-success-llms-comedy)** + presented by Erin Mikail Staples.  Watch the presentation [here](https://www.youtube.com/watch?v=zn5WvgZcdMA) or grab the slides [here](https://docs.google.com/presentation/d/1Mg99Bbjz5SCyzLdqfsw8kqw_d-RGU8cf-Xf4eUE2tXk/edit?usp=sharing).
+This project was built for the **[Databricks Data + AI Summit 2025](https://www.databricks.com/dataaisummit/session/generating-laughter-testing-and-evaluating-success-llms-comedy)** + presented by [Erin Mikail Staples](https://www.linkedin.com/in/erinmikail/).  Watch the presentation [here](https://www.youtube.com/watch?v=zn5WvgZcdMA) or grab the slides [here](https://docs.google.com/presentation/d/1Mg99Bbjz5SCyzLdqfsw8kqw_d-RGU8cf-Xf4eUE2tXk/edit?usp=sharing).
 
-![Powered by Galileo](static/images/05-25-Galileo-Logo-Primary-Horizontal-Light.png)
+👀 **Create your own Startup Simulator 3000!**
+Follow along with [this tutorial](https://galileo.ai/blog/silly-startups-serious-signals-how-to-use-custom-metrics-to-measure-domain-specific-ai-success#why-custom-metrics-matter) to create your very own Startup Simulator 3000 and implement custom metrics to measure domain-specific expertise.
+
 
 ## ✨ Features
 
@@ -26,7 +30,7 @@ This project was built for the **[Databricks Data + AI Summit 2025](https://www.
 
 ### 🤖 Agentic Framework
 
-- Multi-tool agent architecture with LangChain integration
+- Multi-tool agent architecture 
 - Dynamic tool selection based on execution mode
 - Comprehensive input validation and error handling
 - Real-time context fetching from external APIs
