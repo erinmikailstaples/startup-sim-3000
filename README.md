@@ -16,10 +16,8 @@ Follow along with [this tutorial](https://galileo.ai/blog/silly-startups-serious
 
 ### 🎭 Dual Modes
 
-- **Silly Mode**: Generates absurd, creative startup pitches inspired by 
-  HackerNews trends
-- **Serious Mode**: Creates professional, corporate business proposals with 
-  market analysis from NewsAPI
+- **Silly Mode**: Generates absurd, creative startup pitches inspired by HackerNews trends
+- **Serious Mode**: Creates professional, corporate business proposals with market analysis from NewsAPI
 
 ### 🎮 8-bit Web Interface
 
@@ -42,6 +40,9 @@ Follow along with [this tutorial](https://galileo.ai/blog/silly-startups-serious
 - LLM call tracking with token usage and performance metrics
 - Distributed tracing across the entire execution pipeline
 - Custom metrics evaluating the performance of the agent and tools
+- **Optimized session management** - single session per request
+- **Real-time trace visibility** with immediate flushing
+- **Centralized logging architecture** for consistent observability
 
 ## 📋 Quick Reference
 
@@ -418,8 +419,8 @@ NEWS_API_KEY=your_newsapi_key_here
 
 # Optional (for Galileo observability)
 GALILEO_API_KEY=your_galileo_api_key_here
-GALILEO_PROJECT_ID=startup-simulator-v1.2
-GALILEO_LOG_STREAM=my_log_stream
+GALILEO_PROJECT=your_galileo_project_name
+GALILEO_LOG_STREAM=your_log_stream_name
 
 # Optional LLM configuration
 LLM_MODEL=gpt-4
@@ -774,13 +775,17 @@ async def my_tool_function():
     # This function will be automatically logged
     pass
 
-# Custom logging
-from galileo import GalileoLogger
+# Custom logging (using centralized logger)
+from agent_framework.utils.logging import get_galileo_logger
 
-logger = GalileoLogger(project="my-project", log_stream="my-stream")
-trace = logger.start_trace(input="my input", name="my operation")
-# ... do work ...
-logger.conclude(output="my output")
+logger = get_galileo_logger()
+if logger:
+    trace = logger.start_trace(input="my input", name="my operation")
+    # ... do work ...
+    logger.conclude(output="my output")
+    logger.flush()  # Ensure immediate visibility
+else:
+    print("⚠️  Warning: Galileo logger not available")
 ```
 
 #### Adding Custom Metrics
@@ -895,7 +900,36 @@ startup-sim-3000/
 
 ## 📊 Observability
 
-The application includes comprehensive Galileo logging:
+The application includes comprehensive Galileo logging with optimized session management:
+
+### Galileo Session Management
+
+The application uses a **centralized Galileo logger** to prevent multiple sessions per request:
+
+- **Single Logger Instance**: All components use the same Galileo connection
+- **Immediate Flushing**: `logger.flush()` ensures traces appear in real-time
+- **Error Handling**: Graceful fallback when Galileo is unavailable
+- **Session Consistency**: One session per request instead of multiple sessions
+
+### Best Practices for Galileo Logging
+
+```python
+# ✅ Good: Use centralized logger
+from agent_framework.utils.logging import get_galileo_logger
+logger = get_galileo_logger()
+
+if logger:
+    trace = logger.start_trace("my_operation")
+    # ... work ...
+    logger.conclude(output="result")
+    logger.flush()  # Ensure immediate visibility
+else:
+    print("⚠️  Galileo not available")
+
+# ❌ Avoid: Creating multiple loggers
+# logger1 = GalileoLogger(project="my-project")  # Creates session 1
+# logger2 = GalileoLogger(project="my-project")  # Creates session 2
+```
 
 ### Trace Structure
 

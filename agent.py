@@ -631,13 +631,15 @@ class SimpleAgent(Agent):
         print(f"Agent Workflow Start: {json.dumps(workflow_data, indent=2)}")
         
         # Initialize Galileo logger for this agent execution
-        galileo_logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+        from agent_framework.utils.logging import get_galileo_logger
+        galileo_logger = get_galileo_logger()
         
-        # Start the main agent trace - this is the parent trace for the entire workflow
-        trace = galileo_logger.start_trace(f"agent_workflow_{self.mode}")
+        # Start the main agent trace - this is the primary trace for the entire workflow
+        if galileo_logger:
+            trace = galileo_logger.start_trace(f"agent_workflow_{self.mode}")
+        else:
+            print("⚠️  Warning: Galileo logger not available")
+            trace = None
         
         try:
             # Add LLM span for workflow start

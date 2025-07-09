@@ -49,25 +49,28 @@ def generate_startup():
             return jsonify({'error': 'All fields are required'}), 400
         
         # Initialize Galileo logger for this request
-        logger = GalileoLogger(
-            project=os.environ.get("GALILEO_PROJECT"),
-            log_stream=os.environ.get("GALILEO_LOG_STREAM")
-        )
+        from agent_framework.utils.logging import get_galileo_logger
+        logger = get_galileo_logger()
         
         # Start individual trace for this request
-        trace = logger.start_trace(f"Generate startup pitch - {mode} mode - {industry} targeting {audience}")
+        if logger:
+            trace = logger.start_trace(f"Generate startup pitch - {mode} mode - {industry} targeting {audience}")
+        else:
+            print("⚠️  Warning: Galileo logger not available")
+            trace = None
         
         try:
             # Add LLM span for request processing
-            logger.add_llm_span(
-                input=f"API request received for {mode} mode startup generation",
-                output="Request validated and processing started",
-                model="flask_api",
-                num_input_tokens=len(str(api_request)),
-                num_output_tokens=0,
-                total_tokens=len(str(api_request)),
-                duration_ns=0
-            )
+            if logger:
+                logger.add_llm_span(
+                    input=f"API request received for {mode} mode startup generation",
+                    output="Request validated and processing started",
+                    model="flask_api",
+                    num_input_tokens=len(str(api_request)),
+                    num_output_tokens=0,
+                    total_tokens=len(str(api_request)),
+                    duration_ns=0
+                )
             
             # Run the agent asynchronously with proper event loop handling
             loop = asyncio.new_event_loop()
@@ -96,35 +99,39 @@ def generate_startup():
             print(f"API Response: {json.dumps(api_response, indent=2)}")
             
             # Add LLM span for successful completion
-            logger.add_llm_span(
-                input=f"Agent execution completed successfully",
-                output=final_output,
-                model="flask_api",
-                num_input_tokens=len(str(api_request)),
-                num_output_tokens=len(final_output),
-                total_tokens=len(str(api_request)) + len(final_output),
-                duration_ns=0
-            )
-            
-            # Conclude the trace successfully
-            logger.conclude(output=final_output, duration_ns=0)
+            if logger:
+                logger.add_llm_span(
+                    input=f"Agent execution completed successfully",
+                    output=final_output,
+                    model="flask_api",
+                    num_input_tokens=len(str(api_request)),
+                    num_output_tokens=len(final_output),
+                    total_tokens=len(str(api_request)) + len(final_output),
+                    duration_ns=0
+                )
+                
+                # Conclude the trace successfully
+                logger.conclude(output=final_output, duration_ns=0)
+                logger.flush()  # Ensure trace is immediately sent to Galileo
             
             return jsonify({'result': final_output})
             
         except Exception as e:
             # Add LLM span for error
-            logger.add_llm_span(
-                input=f"Agent execution failed",
-                output=str(e),
-                model="flask_api",
-                num_input_tokens=len(str(api_request)),
-                num_output_tokens=len(str(e)),
+            if logger:
+                logger.add_llm_span(
+                    input=f"Agent execution failed",
+                    output=str(e),
+                    model="flask_api",
+                    num_input_tokens=len(str(api_request)),
+                    num_output_tokens=len(str(e)),
                 total_tokens=len(str(api_request)) + len(str(e)),
-                duration_ns=0
-            )
-            
-            # Conclude the trace with error
-            logger.conclude(output=str(e), duration_ns=0)
+                    duration_ns=0
+                )
+                
+                # Conclude the trace with error
+                logger.conclude(output=str(e), duration_ns=0)
+                logger.flush()  # Ensure trace is immediately sent to Galileo
             
             raise e
         
